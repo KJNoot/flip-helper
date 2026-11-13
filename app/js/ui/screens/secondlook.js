@@ -11,6 +11,11 @@ import {
   scanWorkFromLookItem, haggleLines, formatUsd,
   runCloseupCheck, setItemOnScan, sortLookItems, checkedSummary, itemFromLookItem
 } from "../../core/secondlook.js";
+import {
+  LOOK_DEEPER_BUTTON, LOOK_DEEPER_NOTE, MSG_NEED_PHOTO, MSG_VIDEO,
+  shouldLookDeeper, rememberScanSource, getScanSource, forgetScanSource,
+  startLookDeeper, deeperReadyLabel
+} from "../../core/lookdeeper.js";
 import { getSettings } from "../../core/settings.js";
 import { getEnabledIds } from "../../core/prefs.js";
 import { photoFromFile, MAX_PHOTOS } from "../../core/draft.js";
@@ -203,8 +208,13 @@ function paintResults(ctx, el, rawScan, job) {
       <p class="sl-count" id="sl-checked-count">${esc(summary.label)}</p>
       <p class="small muted">${esc(when)} · ${scan.kind === "video" ? "From a video" : "From a photo"}${scan.frameCount ? ` · ${scan.frameCount} still${scan.frameCount === 1 ? "" : "s"}` : ""}</p>
       ${scan.warning ? `<p class="small">${esc(scan.warning)}</p>` : ""}
-      ${job && job.status === "running" ? `<p class="small">${esc(job.progress || "Looking… you can keep shopping")}</p><div class="sl-progress"><span></span></div>` : ""}
+      ${job && job.status === "running" && job.scanId === scan.id ? `<p class="small sl-progress-msg">${esc(job.progress || "Looking… you can keep shopping")}</p><div class="sl-progress"><span></span></div>` : ""}
+      ${job && job.status === "error" && job.scanId === scan.id && job.error ? `<p class="attn" id="sl-deeper-error">${esc(job.error)}</p>` : ""}
+      ${scan.lookedDeeper ? `<p class="small" id="sl-deeper-done">${esc(deeperReadyLabel(scan))}</p>` : ""}
+      ${!scan.lookedDeeper && scan.loadNote ? `<p class="small" id="sl-load-note">${esc(scan.loadNote)}</p>` : ""}
+      ${scan.mergedInto ? `<p class="small">This photo was combined into <a href="#/secondlook/${esc(scan.mergedInto)}">a later look at the same load</a>.</p>` : ""}
       <p class="tiny muted">First guesses from the table. Go check each one up close, then use the price and Help me haggle.</p>
+      ${lookDeeperActions(scan, job)}
     </div>
     <div id="sl-cards">${cards || empty}</div>
     ${dismissed.length ? `<details class="more-block" id="sl-dismissed" style="margin-top:14px"><summary>Not interested (${dismissed.length})</summary>
@@ -236,9 +246,16 @@ function paintResults(ctx, el, rawScan, job) {
     },
     deletescan: () => {
       removeScan(scan.id);
+      forgetScanSource(scan.id);
       if (getJob().scanId === scan.id) resetJob();
       toast("Scan deleted. It was only on this phone.");
       ctx.go("#/secondlook");
+    },
+    lookdeeper: () => kickLookDeeper(ctx, el, scan, { auto: false }),
+    canceldeeper: () => {
+      cancelJob();
+      toast("Cancelled.");
+      paint(ctx, el, scan.id);
     }
   });
 }
@@ -453,9 +470,11 @@ function wireFiles(ctx, el) {
       await p;
       const job = getJob();
       if (job.status === "done" && job.scanId) {
+        rememberScanSource(job.scanId, file);
         // If she's still on this screen (or we send her here), the results are the notice.
         // A toast + banner fire from mountSecondLookBanner when she's shopping elsewhere.
         ctx.go("#/secondlook/" + job.scanId);
+        maybeAutoLookDeeper(ctx, el, job);
       } else if (job.status === "error") {
         paint(ctx, el, "");
       } else {
@@ -557,4 +576,68 @@ export function mountSecondLookBanner(ctx) {
   return paint;
 }
 
-export { formatWhen, EARBUD_LATER };
+function lookDeeperActions(scan, job) {
+  if (!scan || scan.kind === "video") return "";
+  const running = job && job.status === "running" && job.lookingDeeper && job.scanId === scan.id;
+  if (running) {
+    return `<div class="stack sl-deeper" style="margin-top:12px">
+      <button type="button" class="btn ghost" data-act="canceldeeper">Cancel</button>
+    </div>`;
+  }
+  if (scan.lookedDeeper) return "";
+  return `<div class="stack sl-deeper" id="sl-look-deeper" style="margin-top:14px">
+    <button type="button" class="btn btn-main" data-act="lookdeeper">${esc(LOOK_DEEPER_BUTTON)}</button>
+    <p class="tiny muted">${esc(LOOK_DEEPER_NOTE)}</p>
+  </div>`;
+}
+
+function maybeAutoLookDeeper(ctx, el, job) {
+  const id = job && job.scanId;
+  if (!id) return;
+  const scan = getScan(id);
+  if (!scan || scan.kind === "video" || scan.lookedDeeper) return;
+  if (!shouldLookDeeper(scan, { kind: scan.kind })) return;
+  if (!getScanSource(scan.id)) return;
+  kickLookDeeper(ctx, el, scan, { auto: true });
+}
+
+async function kickLookDeeper(ctx, el, scan, { auto } = {}) {
+  if (!scan) return;
+  if (!getScanSource(scan.id)) {
+    toast(MSG_NEED_PHOTO);
+    return;
+  }
+  if (scan.kind === "video") {
+    toast(MSG_VIDEO);
+    return;
+  }
+  try {
+    const p = startLookDeeper({ scanId: scan.id, auto: !!auto });
+    paint(ctx, el, scan.id);
+    await p;
+    const job = getJob();
+    if (job.status === "done" && job.scanId) {
+      ctx.go("#/secondlook/" + job.scanId);
+    } else {
+      paint(ctx, el, scan.id);
+    }
+  } catch (e) {
+    if (e && e.code === "need-photo") {
+      toast(MSG_NEED_PHOTO);
+      return;
+    }
+    if (e && e.code === "no-key") {
+      toast(MSG_NO_KEY);
+      ctx.go("#/settings");
+      return;
+    }
+    if (e && e.code === "busy") {
+      toast(e.message);
+      return;
+    }
+    toast((e && e.message) || "The closer look couldn't be finished. Try again.");
+    paint(ctx, el, scan.id);
+  }
+}
+
+export { formatWhen, EARBUD_LATER, lookDeeperActions, maybeAutoLookDeeper };
