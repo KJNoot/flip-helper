@@ -108,6 +108,7 @@ export function normalizeDraft(raw = {}) {
   const photoShows = raw.photoShows || raw.photo_shows || null;
   const material = /^unknown$/i.test(String(raw.material || "").trim()) ? "" : String(raw.material || "").trim();
   const size = /^unknown$/i.test(String(raw.size || "").trim()) ? "" : String(raw.size || "").trim();
+  const adviceSrc = (raw.siteAdvice && typeof raw.siteAdvice === "object") ? raw.siteAdvice : {};
   return {
     title: String(raw.title || "").trim(),
     description: String(raw.description || "").trim(),
@@ -127,9 +128,12 @@ export function normalizeDraft(raw = {}) {
     priceHigh: money(raw.priceHigh ?? raw.price_high),
     priceReason: String(raw.priceReason || raw.price_reason || "").trim(),
     siteTweaks,
+    // Idempotent: a second pass (applyDraft after requestDraft already
+    // normalized) must keep siteAdvice. The first pass stores it under
+    // siteAdvice, not bestPrice / fastestSale at the top level.
     siteAdvice: normalizeAdvice({
-      bestPrice: raw.bestPrice || raw.best_price,
-      fastestSale: raw.fastestSale || raw.fastest_sale
+      bestPrice: adviceSrc.bestPrice || adviceSrc.best_price || raw.bestPrice || raw.best_price,
+      fastestSale: adviceSrc.fastestSale || adviceSrc.fastest_sale || raw.fastestSale || raw.fastest_sale
     })
   };
 }

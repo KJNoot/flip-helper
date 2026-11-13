@@ -14,6 +14,7 @@ import { getActionLog, failedActions, clearActionLog, formatActionTime } from ".
 import { parseCsv, suggestMapping, rowsToItems, findDuplicateGroups, mergeItems, itemsToCsv, CSV_FIELDS } from "../../core/csv.js";
 import { setWalkthroughDone } from "../../core/walkthrough.js";
 import { openWalkthrough } from "../walkthrough.js";
+import { openIntro } from "../intro.js";
 import { clearAskHistory } from "../ask.js";
 import { clearWork, clearScanWork, clearBatch } from "../../core/autosave.js";
 import { tip, openTip } from "../tips.js";
@@ -141,6 +142,16 @@ export function renderSettings(ctx, el) {
       <button type="button" class="btn soft sm" data-act="clearlog">Clear this log</button>
     </div>` : ""}
 
+    <div class="card" id="introcard">
+      <h3>Intro and demo</h3>
+      <p class="small muted">Watch the short video, or try a pretend listing with a photo. Nothing is posted, and your real items are left alone.</p>
+      <div class="stack">
+        <button type="button" class="btn soft" data-act="watchintro">Watch the intro</button>
+        <button type="button" class="btn soft" data-act="trydemo">Try the demo</button>
+        <button type="button" class="btn soft" data-act="rewalk">Show the welcome tips</button>
+      </div>
+    </div>
+
     <details class="more-block" style="margin-top:14px">
       <summary>More</summary>
       <div class="card">
@@ -156,7 +167,7 @@ export function renderSettings(ctx, el) {
 
     <div class="card flat honesty-card">
       <h3>What this version does</h3>
-      <p class="small">${honesty("ok", "Working")} Photo to a draft, Buy or pass with a “Buy up to” amount, inventory with bins and QR labels, full profit, a sold take-down checklist with a guided walk-through, price-drop ideas that respect your profit floor, a morning list, taxes, CSV import and export, and an Ask-a-question helper. Works offline except for AI checks.</p>
+      <p class="small">${honesty("ok", "Working")} A first-open welcome and a “try it before you install” demo (sandboxed — nothing is posted, and your real items are left alone), photo to a draft, Buy or pass with a “Buy up to” amount, inventory with bins and QR labels, full profit, a sold take-down checklist with a guided walk-through, price-drop ideas that respect your profit floor, a morning list, taxes, CSV import and export, and an Ask-a-question helper. Works offline except for AI checks. The intro video plays when the file is in place; until then you'll see a “Video coming soon” poster.</p>
       <p class="small">${honesty("warn", "Estimate")} AI prices, sold-price estimates, fees, shipping costs, pricing options, and Buy or pass verdicts.</p>
       <p class="small">${honesty("warn", "Needs you to post")} Posting, taking listings down, and changing a price is something you do in each site's own app. The guided take-down opens each site and ticks it off when you say you did it. Jessika's Flip Side does not log into those accounts.</p>
       <p class="small">${honesty("later", "Coming later")} Official one-tap listing and take-down (eBay, Etsy, Shopify first), official eBay sold prices, a computer helper, and buying shipping labels. Some sites will always need your tap. Not promised for Poshmark, Mercari, or Facebook Marketplace unless those companies open an official door.</p>
@@ -352,6 +363,12 @@ export function renderSettings(ctx, el) {
     rewalk: () => {
       setWalkthroughDone(false);
       openWalkthrough({ onDone: () => toast("You can open this again any time from Settings.") });
+    },
+    watchintro: () => {
+      openIntro({ mode: "welcome", fromSettings: true });
+    },
+    trydemo: () => {
+      openIntro({ mode: "demo", fromSettings: true });
     },
     csvimport: async () => {
       await runCsvImport(ctx, el);
