@@ -512,13 +512,13 @@ describe("v0.7.0 studio photo math", () => {
 
 
 describe("v0.7.0 wiring, version, and service worker", () => {
-  it("bumps the app, package, and service worker to v0.7.4 and caches studio modules but not the model", () => {
+  it("bumps the app, package, and service worker to v0.8.0 and caches studio modules but not the model", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.7.4");
+    assert.equal(pkg.version, "0.8.0");
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.7\.4"/);
+    assert.match(main, /export const VERSION = "0\.8\.0"/);
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.7\.4/);
+    assert.match(sw, /flip-helper-v0\.8\.0/);
     assert.match(sw, /js\/core\/studio\.js/);
     assert.match(sw, /js\/core\/segment\.js/);
     assert.match(sw, /js\/core\/studio-worker\.js/);

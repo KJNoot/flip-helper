@@ -23,6 +23,7 @@ import { clearSecondLook } from "../../core/secondlook.js";
 import { tip, openTip } from "../tips.js";
 import { PHOTO_CLEANUP_NOTE } from "../../core/photo.js";
 import { STUDIO_NOTE, STUDIO_BUTTON } from "../../core/studio.js";
+import { syncCardShell, bindSyncCard } from "../syncui.js";
 
 export function renderSettings(ctx, el) {
   const n = ctx.items.length;
@@ -46,6 +47,8 @@ export function renderSettings(ctx, el) {
         <button type="button" class="btn dangerghost sm" data-act="removekey">Remove key</button>
       </div>
     </div>
+
+    ${syncCardShell()}
 
     <div class="card" id="pausecard">
       <div class="row between"><h3>Pause all automation</h3>${honesty("ok", "Working")} ${tip("Today this pauses reminders and notifications. When automatic listing and take-down are added, this same switch will pause those too.")}</div>
@@ -186,6 +189,19 @@ export function renderSettings(ctx, el) {
     <p class="tiny muted center" id="no-sub">${esc(NO_SUBSCRIPTION_NOTE)}</p>
     <p class="tiny muted center">Jessika's Flip Side v${esc(ctx.version)}</p>
   `;
+
+  bindSyncCard(el, {
+    async runSyncNow() {
+      const { runSync } = await import("../../core/sync.js");
+      const sl = await import("../../core/secondlook.js");
+      return runSync({
+        store: ctx.store,
+        loadScans: () => sl.loadScans(),
+        saveScan: s => sl.saveScan(s),
+        removeScan: id => sl.removeScan(id)
+      });
+    }
+  }).catch(() => { /* card stays on "Loading…" if sync.js fails to load */ });
 
   $("#imp", el).addEventListener("change", async e => {
     const f = e.target.files[0]; if (!f) return;
