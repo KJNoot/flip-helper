@@ -18,8 +18,10 @@ import { shouldShowWalkthrough, walkthroughDone } from "./core/walkthrough.js";
 import { openWalkthrough } from "./ui/walkthrough.js";
 import { shouldShowIntro } from "./core/intro.js";
 import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.js";
+import { shouldShowTermsGate, rememberInviteIfValid } from "./core/invite.js";
+import { openTerms, closeTerms, isTermsOpen } from "./ui/terms.js";
 
-export const VERSION = "0.4.1";
+export const VERSION = "0.5.0";
 
 const view = $("#view");
 const store = await createStore();
@@ -108,6 +110,7 @@ function render() {
     ctx.screen = SCREEN_NAMES[head];
     renderHome(ctx, view);
     queueMicrotask(() => {
+      if (isTermsOpen()) return;
       if (!isIntroOpen()) {
         openIntro({
           mode: head === "demo" ? "demo" : "welcome",
@@ -194,8 +197,9 @@ function afterIntro() {
 render();
 tickReminders();
 
-// First-open welcome (video + try-it demo), then the short tips.
-// Tests can skip with ?nointro or by opening after intro is marked done.
+// First-open: private invite may show terms first, then the welcome video
+// and try-it demo, then the short tips. Public visits (no token) skip terms.
+// Tests can skip the video with ?nointro, and the terms with ?noterms.
 const { head: firstHead } = parseHash();
 const autoIntro = shouldShowIntro(undefined, {
   quiet: window.__flipQuiet,
@@ -203,7 +207,31 @@ const autoIntro = shouldShowIntro(undefined, {
   respectWalkthrough: true,
   walkthroughDone: walkthroughDone()
 });
-if (firstHead === "welcome" || firstHead === "demo") {
+
+function startAfterTerms() {
+  if (firstHead === "welcome" || firstHead === "demo") {
+    if (!isIntroOpen()) {
+      openIntro({
+        mode: firstHead === "demo" ? "demo" : "welcome",
+        onDone: afterIntro
+      });
+    }
+    return;
+  }
+  if (autoIntro) openIntro({ onDone: afterIntro });
+  else if (shouldShowWalkthrough() && !window.__flipQuiet && !/[?&]nowalk\b/.test(location.search)) {
+    openWalkthrough();
+  }
+}
+
+await rememberInviteIfValid(location.search);
+const needsTerms = await shouldShowTermsGate(undefined, {
+  quiet: window.__flipQuiet,
+  search: location.search
+});
+if (needsTerms) {
+  openTerms({ onDone: startAfterTerms });
+} else if (firstHead === "welcome" || firstHead === "demo") {
   // render() already queued the overlay
 } else if (autoIntro) {
   openIntro({ onDone: afterIntro });
@@ -227,5 +255,8 @@ window.__flip = {
   openIntro,
   closeIntro,
   isIntroOpen,
-  getDemoSession
+  getDemoSession,
+  openTerms,
+  closeTerms,
+  isTermsOpen
 };

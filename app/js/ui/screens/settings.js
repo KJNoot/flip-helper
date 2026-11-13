@@ -15,6 +15,8 @@ import { parseCsv, suggestMapping, rowsToItems, findDuplicateGroups, mergeItems,
 import { setWalkthroughDone } from "../../core/walkthrough.js";
 import { openWalkthrough } from "../walkthrough.js";
 import { openIntro } from "../intro.js";
+import { openTerms } from "../terms.js";
+import { shouldShowTermsInSettings, clearTerms } from "../../core/invite.js";
 import { clearAskHistory } from "../ask.js";
 import { clearWork, clearScanWork, clearBatch } from "../../core/autosave.js";
 import { tip, openTip } from "../tips.js";
@@ -149,6 +151,7 @@ export function renderSettings(ctx, el) {
         <button type="button" class="btn soft" data-act="watchintro">Watch the intro</button>
         <button type="button" class="btn soft" data-act="trydemo">Try the demo</button>
         <button type="button" class="btn soft" data-act="rewalk">Show the welcome tips</button>
+        ${shouldShowTermsInSettings() ? `<button type="button" class="btn soft" data-act="readterms">Read the terms</button>` : ""}
       </div>
     </div>
 
@@ -167,7 +170,7 @@ export function renderSettings(ctx, el) {
 
     <div class="card flat honesty-card">
       <h3>What this version does</h3>
-      <p class="small">${honesty("ok", "Working")} A first-open welcome and a “try it before you install” demo (sandboxed — nothing is posted, and your real items are left alone), photo to a draft, Buy or pass with a “Buy up to” amount, inventory with bins and QR labels, full profit, a sold take-down checklist with a guided walk-through, price-drop ideas that respect your profit floor, a morning list, taxes, CSV import and export, and an Ask-a-question helper. Works offline except for AI checks. The first-open welcome plays a short promo video (muted, with tap-for-sound and a skip button).</p>
+      <p class="small">${honesty("ok", "Working")} A first-open welcome and a “try it before you install” demo (sandboxed — nothing is posted, and your real items are left alone), photo to a draft, Buy or pass with a “Buy up to” amount, inventory with bins and QR labels, full profit, a sold take-down checklist with a guided walk-through, price-drop ideas that respect your profit floor, a morning list, taxes, CSV import and export, and an Ask-a-question helper. Works offline except for AI checks. The first-open welcome plays a short promo video (muted, with tap-for-sound and a skip button). A private invite can show a short terms summary before that video; the public link does not.</p>
       <p class="small">${honesty("warn", "Estimate")} AI prices, sold-price estimates, fees, shipping costs, pricing options, and Buy or pass verdicts.</p>
       <p class="small">${honesty("warn", "Needs you to post")} Posting, taking listings down, and changing a price is something you do in each site's own app. The guided take-down opens each site and ticks it off when you say you did it. Jessika's Flip Side does not log into those accounts.</p>
       <p class="small">${honesty("later", "Coming later")} Official one-tap listing and take-down (eBay, Etsy, Shopify first), official eBay sold prices, a computer helper, and buying shipping labels. Some sites will always need your tap. Not promised for Poshmark, Mercari, or Facebook Marketplace unless those companies open an official door.</p>
@@ -370,6 +373,9 @@ export function renderSettings(ctx, el) {
     trydemo: () => {
       openIntro({ mode: "demo", fromSettings: true });
     },
+    readterms: () => {
+      openTerms({ mode: "read" });
+    },
     csvimport: async () => {
       await runCsvImport(ctx, el);
     },
@@ -399,6 +405,7 @@ export function renderSettings(ctx, el) {
       clearBatch();
       clearAskHistory();
       setWalkthroughDone(false);
+      clearTerms();
       ctx.work = null;
       ctx.scanWork = null;
       toast("Everything deleted");

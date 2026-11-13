@@ -79,6 +79,7 @@ try {
   await step("first-open welcome plays the intro video and offers a try-it demo", async () => {
     await page.waitForSelector("#intro-root");
     assert.ok(await page.isVisible("#intro-root"), "welcome opens on first open");
+    assert.equal(await page.locator("#terms-root").count(), 0, "public link has no terms gate");
     assert.match(await intro(), /Jessika.?s/);
     assert.match(await intro(), /Flip Side/);
     // Wait for the lazy-loaded promo to replace the placeholder.
@@ -240,7 +241,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Jessika's Flip Side v0\.4\.1/);
+    assert.match(await text(), /Jessika's Flip Side v0\.5\.0/);
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);
@@ -572,6 +573,143 @@ try {
     assert.equal(hasKey, false);
     await go("#/settings");
     assert.match(await text(), /No key saved/);
+  });
+
+
+  const inviteFile = process.env.FLIP_SIDE_INVITE_FILE || "/home/box/.secrets/flip-side-invite-link.txt";
+  const readInviteToken = () => {
+    if (!existsSync(inviteFile)) return "";
+    const raw = readFileSync(inviteFile, "utf8").trim();
+    const m = raw.match(/[?&]invite=([^&\s]+)/);
+    return m ? decodeURIComponent(m[1]) : "";
+  };
+
+  const fresh = async (search, fn) => {
+    const ctx2 = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      deviceScaleFactor: 2,
+      isMobile: true,
+      hasTouch: true,
+      userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"
+    });
+    const p2 = await ctx2.newPage();
+    p2.setDefaultTimeout(10000);
+    p2.on("pageerror", e => { errors.push("pageerror: " + e.message); console.log("  page error:", e.message); });
+    try {
+      await p2.goto(`http://127.0.0.1:${srv.address().port}/index.html` + search);
+      await p2.waitForSelector("html[data-ready='1']");
+      await p2.evaluate(() => { window.__flipFast = true; });
+      await fn(p2);
+    } finally {
+      await ctx2.close();
+    }
+  };
+
+  const shotOn = async (p2, name, also) => {
+    await p2.waitForTimeout(200);
+    const file = `${OUT}${String(++n).padStart(2, "0")}-${name}.png`;
+    await p2.screenshot({ path: file, fullPage: false });
+    const aliases = also == null ? [] : (Array.isArray(also) ? also : [also]);
+    for (const destName of aliases) {
+      const dest = join(SHOTS, destName);
+      copyFileSync(file, dest);
+      console.log("  shot", destName);
+    }
+    return file;
+  };
+
+  await step("a bad or missing invite token does not show the terms gate", async () => {
+    await fresh("?nosw&invite=not-a-real-invite-token-xxxxx", async p2 => {
+      await p2.waitForSelector("#intro-root");
+      assert.equal(await p2.locator("#terms-root").count(), 0, "bad token has no gate");
+      assert.ok(await p2.isVisible("#intro-root"), "public welcome still opens");
+      await p2.waitForFunction(() => {
+        const v = document.querySelector("#intro-vid");
+        return v && !v.hidden && v.readyState >= 1;
+      });
+      assert.ok(await p2.isVisible("#intro-vid"), "welcome video still plays");
+      await shotOn(p2, "public-no-gate", "v5-public-welcome.png");
+    });
+  });
+
+  await step("a valid invite shows the terms gate, then the welcome video after agree", async () => {
+    const token = readInviteToken();
+    assert.ok(token && token.length >= 24, "invite token file is missing; expected /home/box/.secrets/flip-side-invite-link.txt");
+    await fresh("?nosw&invite=" + encodeURIComponent(token), async p2 => {
+      await p2.waitForSelector("#terms-root");
+      assert.ok(await p2.isVisible("#terms-root"), "valid token shows the terms gate");
+      assert.equal(await p2.locator("#intro-root").count(), 0, "video waits until she agrees");
+      const body = await p2.textContent("#terms-root");
+      assert.match(body, /Before we start/);
+      assert.match(body, /You and Teddy get half/);
+      assert.match(body, /Ken carries all the costs/);
+      assert.match(body, /you never owe anything/);
+      assert.match(body, /Your ideas go into the app/);
+      assert.match(body, /passes to your family/);
+      assert.match(body, /full written agreement will come separately/);
+      assert.match(body, /I've read this and I agree/);
+      assert.doesNotMatch(body, /Hasier/i);
+      const accept = p2.locator('#terms-root [data-act="accept"]');
+      assert.equal(await accept.isDisabled(), true);
+      await p2.check("#terms-agree");
+      assert.equal(await accept.isDisabled(), true, "name is required");
+      await p2.fill("#terms-name", "Jessika");
+      assert.equal(await accept.isDisabled(), false);
+      await shotOn(p2, "terms-gate", "v5-terms-gate.png");
+      await accept.click();
+      await p2.waitForSelector('#terms-root [data-terms-step="thanks"]');
+      const thanks = await p2.textContent("#terms-root");
+      assert.match(thanks, /You're in/);
+      assert.ok(await p2.isVisible('#terms-root [data-act="mailto"]'));
+      assert.match(await p2.textContent('#terms-root [data-act="mailto"]'), /Send my OK to Ken/);
+      const href = await p2.getAttribute('#terms-root [data-act="mailto"]', "href");
+      assert.match(href || "", /^mailto:kens\.remi@mail\.grokbot\.com\?/);
+      assert.match(decodeURIComponent(href), /Flip Side: I agree to the terms/);
+      assert.match(decodeURIComponent(href), /Name: Jessika/);
+      assert.match(decodeURIComponent(href), /Terms version: 1/);
+      assert.doesNotMatch(href, /kennethnootbaar6/i);
+      const saved = await p2.evaluate(() => JSON.parse(localStorage.getItem("flip-helper.termsAccepted") || "null"));
+      assert.equal(saved && saved.name, "Jessika");
+      assert.equal(saved && saved.version, "1");
+      assert.ok(saved && saved.acceptedAt);
+      await shotOn(p2, "terms-thanks", "v5-terms-thanks.png");
+      await p2.click('#terms-root [data-act="continue"]');
+      await p2.waitForSelector("#terms-root", { state: "detached" });
+      await p2.waitForSelector("#intro-root");
+      assert.ok(await p2.isVisible("#intro-root"), "welcome video follows the agreement");
+      await p2.waitForFunction(() => {
+        const v = document.querySelector("#intro-vid");
+        return v && !v.hidden && v.readyState >= 1;
+      });
+      const src = await p2.getAttribute("#intro-vid", "src");
+      assert.match(src || "", /media\/intro\.mp4/);
+      await shotOn(p2, "welcome-after-agree", "v5-welcome-after-agree.png");
+
+      // Reload with the same token: no gate the second time, video still plays.
+      await p2.reload();
+      await p2.waitForSelector("html[data-ready='1']");
+      await p2.waitForTimeout(400);
+      assert.equal(await p2.locator("#terms-root").count(), 0, "accepted terms are not shown again");
+      await p2.waitForSelector("#intro-root");
+      assert.ok(await p2.isVisible("#intro-root"));
+
+      // Finish intro so Settings is reachable, and reread the terms.
+      await p2.evaluate(() => {
+        localStorage.setItem("flip-helper.introDone", "1");
+        localStorage.setItem("flip-helper.walkthroughDone", "1");
+      });
+      await p2.evaluate(() => { if (window.__flip && window.__flip.closeIntro) window.__flip.closeIntro({ completed: true }); });
+      await p2.evaluate(() => { location.hash = "#/settings"; });
+      await p2.waitForSelector("#introcard");
+      assert.match(await p2.textContent("#view"), /Read the terms/);
+      await p2.click('[data-act="readterms"]');
+      await p2.waitForSelector('#terms-root [data-terms-step="read"]');
+      assert.match(await p2.textContent("#terms-root"), /Before we start/);
+      assert.match(await p2.textContent("#terms-root"), /You and Teddy get half/);
+      await shotOn(p2, "settings-reread", "v5-settings-terms.png");
+      await p2.click('#terms-root [data-act="close"]');
+      await p2.waitForSelector("#terms-root", { state: "detached" });
+    });
   });
 
   if (errors.length) {

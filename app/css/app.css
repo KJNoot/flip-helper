@@ -352,3 +352,21 @@ body.intro-open .toast{bottom:calc(var(--sab) + 16px)}
   .demo-sites li{transition:none}
 }
 .demo-end .intro-wordmark{margin-top:8px;margin-bottom:16px}
+
+/* ===== v0.5 invite-only terms gate ===== */
+body.terms-open{overflow:hidden}
+body.terms-open .apphead,
+body.terms-open .tabs,
+body.terms-open #ask-fab{visibility:hidden;pointer-events:none}
+.terms-root{position:fixed;inset:0;z-index:70;background:var(--bg);overflow:auto;-webkit-overflow-scrolling:touch;padding:calc(var(--sat) + 16px) 16px calc(var(--sab) + 24px);display:flex;flex-direction:column}
+.terms-sheet{max-width:560px;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:4px;padding-bottom:12px}
+.terms-sheet h1{font-size:2rem;margin:8px 0 16px;letter-spacing:-.03em}
+.terms-summary p{font-size:1.12rem;line-height:1.45;margin:0 0 14px}
+.terms-summary p.muted{font-size:1.02rem}
+.terms-check{font-size:1.08rem;margin:8px 0 6px;align-items:flex-start;padding:8px 0}
+.terms-check input{margin-top:2px}
+.terms-sheet .field{margin:8px 0 16px}
+.terms-sheet .field>span{font-size:.9rem}
+.terms-sheet .field input{font-size:1.08rem;min-height:54px}
+.terms-sheet .btn-main{margin-top:4px}
+.terms-sheet .stack{margin-top:18px}
