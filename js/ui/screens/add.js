@@ -10,7 +10,7 @@ import { alreadyOwnedMatches, alreadyOwnedWarning } from "../../core/match.js";
 import { applyCleanedPhoto, captureOriginals, pushHistory } from "../../core/history.js";
 import { catchMistakes } from "../../core/mistakes.js";
 import { beginDictate } from "../dictation.js";
-import { PHOTO_CLEANUP_NOTE } from "../../core/photo.js";
+import { STUDIO_NOTE, STUDIO_BUTTON } from "../../core/studio.js";
 import { openTip } from "../tips.js";
 
 export function renderAdd(ctx, el) {
@@ -69,8 +69,8 @@ function paint(ctx, el) {
             <span>🖼 Choose</span>
           </label>` : ""}
       </div>
-      ${photos.length ? `<button type="button" class="btn soft sm" data-act="cleanup" style="margin-top:10px">Clean up photos (basic)</button>
-        <p class="tiny muted">${esc(PHOTO_CLEANUP_NOTE)}</p>` : ""}
+      ${photos.length ? `<button type="button" class="btn" data-act="cleanup" style="margin-top:10px">${esc(STUDIO_BUTTON)}</button>
+        <p class="tiny muted"><span class="honesty ok">Recommended</span> ${esc(STUDIO_NOTE)}</p>` : ""}
     </div>
     <div class="card">
       <label class="field"><span>What you paid (optional)</span>
@@ -171,14 +171,31 @@ function paint(ctx, el) {
       else paint(ctx, el);
     },
     cleanup: () => {
-      const first = (ctx.work.item.photos || [])[0];
-      if (!first) { toast("Take a photo first"); return; }
+      const photos = ctx.work.item.photos || [];
+      if (!photos.length) { toast("Take a photo first"); return; }
+      const toastFor = (kind, many) => {
+        if (kind === "studio") toast(many ? "Studio photos ready. The originals are kept. Check that flaws are still visible." : "Studio photo ready. The original is kept. Check that flaws are still visible.");
+        else toast(many ? "Photos cleaned up (basic). The originals are kept." : "Photo cleaned up (basic). The original is kept.");
+      };
       openCleanup({
-        dataUrl: first.originalDataUrl || first.dataUrl,
-        onApply: (dataUrl) => {
-          const photos = applyCleanedPhoto(ctx.work.item.photos || [], 0, dataUrl);
-          ctx.work.item = captureOriginals({ ...ctx.work.item, photos });
-          toast("Photo cleaned up (basic). The original is kept.");
+        photos,
+        index: 0,
+        onApply: (dataUrl, { index = 0, kind = "studio" } = {}) => {
+          const next = applyCleanedPhoto(ctx.work.item.photos || [], index, dataUrl, Date.now(), { kind });
+          ctx.work.item = captureOriginals({ ...ctx.work.item, photos: next });
+          toastFor(kind, false);
+          autosave(ctx);
+          paint(ctx, el);
+        },
+        onApplyAll: (results) => {
+          let list = ctx.work.item.photos || [];
+          const at = Date.now();
+          (results || []).forEach((r, i) => {
+            if (r && r.dataUrl) list = applyCleanedPhoto(list, i, r.dataUrl, at, { kind: r.kind || "studio" });
+          });
+          ctx.work.item = captureOriginals({ ...ctx.work.item, photos: list });
+          const anyBasic = (results || []).some(r => r && r.kind === "basic");
+          toastFor(anyBasic && !(results || []).some(r => r && r.kind === "studio") ? "basic" : "studio", true);
           autosave(ctx);
           paint(ctx, el);
         }

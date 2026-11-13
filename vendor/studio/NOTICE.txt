@@ -1,0 +1,19 @@
+Studio photo uses U²-Netp, a small salient-object model, to remove
+backgrounds on the phone. No photo is sent to a paid API.
+
+Model: U²-Netp
+Paper: Qin, Xuebin et al., "U2-Net: Going Deeper with Nested U-Structure
+       for Salient Object Detection," Pattern Recognition, 2020.
+Source: https://github.com/xuebinqin/U-2-Net
+License: Apache License 2.0 (see U2-Net-LICENSE.txt)
+ONNX weights: the u2netp.onnx file published with rembg
+  https://github.com/danielgatis/rembg  (MIT)
+  SHA-256: 309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8
+  Size: 4,574,861 bytes (~4.36 MiB)
+Input: 320×320 RGB, ImageNet normalization.
+
+Runtime: onnxruntime-web (Microsoft, MIT), lazy-loaded from jsDelivr
+  and cached by the browser after the first use.
+
+These files are not precached by the service worker. They load only
+when someone taps “Make it look pro.”

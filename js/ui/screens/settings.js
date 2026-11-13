@@ -22,6 +22,7 @@ import { clearWork, clearScanWork, clearBatch } from "../../core/autosave.js";
 import { clearSecondLook } from "../../core/secondlook.js";
 import { tip, openTip } from "../tips.js";
 import { PHOTO_CLEANUP_NOTE } from "../../core/photo.js";
+import { STUDIO_NOTE, STUDIO_BUTTON } from "../../core/studio.js";
 
 export function renderSettings(ctx, el) {
   const n = ctx.items.length;
@@ -164,8 +165,9 @@ export function renderSettings(ctx, el) {
         <button type="button" class="btn soft sm" data-act="rewalk">Show the welcome tips</button>
       </div>
       <div class="card">
-        <h3>Photo clean-up</h3>
-        <p class="small muted">${esc(PHOTO_CLEANUP_NOTE)}</p>
+        <h3>Studio photo</h3>
+        <p class="small muted">The button is “${esc(STUDIO_BUTTON)}.” ${esc(STUDIO_NOTE)}</p>
+        <p class="small muted">A basic clean-up is still there if you want it. ${esc(PHOTO_CLEANUP_NOTE)}</p>
       </div>
     </details>
 
