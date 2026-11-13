@@ -370,3 +370,41 @@ body.terms-open #ask-fab{visibility:hidden;pointer-events:none}
 .terms-sheet .field input{font-size:1.08rem;min-height:54px}
 .terms-sheet .btn-main{margin-top:4px}
 .terms-sheet .stack{margin-top:18px}
+
+
+/* ===== v0.6 Second look ===== */
+.sl-start-actions{margin-top:14px}
+.sl-filebtn{position:relative;cursor:pointer}
+.sl-filebtn input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+.sl-progress{height:8px;background:var(--line);border-radius:99px;overflow:hidden;margin:12px 0}
+.sl-progress>span{display:block;height:100%;width:40%;border-radius:99px;background:var(--a1);animation:sl-indeterminate 1.2s ease-in-out infinite}
+@keyframes sl-indeterminate{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
+@media (prefers-reduced-motion:reduce){.sl-progress>span{animation:none;width:100%;opacity:.6}}
+.sl-progress-msg{font-size:1.12rem;font-weight:700;margin:6px 0 4px}
+.sl-card{margin-top:14px}
+.sl-card .sl-name{margin:0;flex:1;min-width:0}
+.sl-thumb{display:block;width:100%;max-height:220px;object-fit:cover;border-radius:16px;background:var(--soft);margin:10px 0}
+.sl-thumb-ph{display:grid;place-items:center;height:140px;font-size:2.4rem;color:var(--muted)}
+.sl-where{font-size:1.02rem;margin:6px 0}
+.sl-range{font-size:1.55rem;font-weight:800;margin:4px 0 6px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sl-checks ul,.sl-skip-list{margin:6px 0 0;padding-left:1.15em}
+.sl-checks li,.sl-skip-list li{margin:0 0 4px}
+.sl-actions{margin-top:14px;margin-bottom:8px}
+#sl-cards{padding-bottom:8px}
+.sl-privacy{margin-top:14px}
+.sl-haggle-sheet{max-height:90dvh;overflow:auto}
+.sl-haggle-nums{margin:12px 0}
+.sl-haggle-nums .card.stat{margin:0}
+.sl-line{display:flex;flex-direction:column;gap:8px;padding:12px 0;border-top:1px solid var(--line)}
+.sl-line p{margin:0;font-size:1.05rem}
+.sl-line .btn{width:auto;align-self:flex-start}
+#sl-earbud{margin-top:16px}
+#sl-bundle{margin-top:14px}
+.sl-banner{position:fixed;top:calc(var(--sat) + var(--headh));left:0;right:0;z-index:19;padding:10px 16px;text-align:center;font-weight:750;font-size:.98rem;box-shadow:var(--shadow)}
+.sl-banner a{color:inherit;text-decoration:none;display:block;min-height:28px}
+.sl-banner-run{background:var(--attnbg);color:var(--attn)}
+.sl-banner-done{background:color-mix(in srgb,var(--ok) 18%,var(--card));color:var(--ok)}
+.sl-banner-err{background:color-mix(in srgb,var(--bad) 14%,var(--card));color:var(--bad)}
+body.sl-banner-on #view{padding-top:calc(var(--sat) + var(--headh) + 12px + 48px)}
+body.intro-open #sl-chrome,
+body.terms-open #sl-chrome{display:none}

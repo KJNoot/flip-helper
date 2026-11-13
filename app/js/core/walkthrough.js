@@ -17,7 +17,7 @@ export const WALKTHROUGH_SCREENS = [
     id: "add",
     title: "Start with a photo",
     body: "On the bottom row, tap Add. Take a photo, then tap “Make a draft from the photo”. Check the draft, change anything that's wrong, and tap Save.",
-    extra: "You can also write the listing yourself, or use Buy or pass at a thrift store to see if an item is worth buying."
+    extra: "You can also write the listing yourself, use Buy or pass at a thrift store to see if an item is worth buying, or tap Second look: scan a table to film a whole table and get things worth a closer look."
   },
   {
     id: "sell",
@@ -28,7 +28,7 @@ export const WALKTHROUGH_SCREENS = [
   {
     id: "help",
     title: "Help is always here",
-    body: "Tap “Ask a question” any time — the round button — and ask in plain words. You'll get a short answer and which button to tap. “Send a suggestion” at the top sends an idea to the people building the app.",
+    body: "Tap “Ask a question” any time — the round button — and ask in plain words. You'll get a short answer and which button to tap. “Send a suggestion” at the top sends an idea to the people building the app. On Home, “Second look: scan a table” is a second set of eyes at a flea market.",
     extra: "You're ready. You can see these tips again from Settings."
   }
 ];

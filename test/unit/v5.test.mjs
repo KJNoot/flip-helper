@@ -228,9 +228,9 @@ describe("privacy: no personal data or invite token in the public repo", () => {
       assert.equal(tokenHits.length, 0, "invite token leaked into " + tokenHits.join(", "));
     }
   });
-  it("service worker caches the new terms modules under v0.5.0", () => {
+  it("service worker caches the new terms modules under the current version", () => {
     const sw = readFileSync(join(APP, "sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.5\.0/);
+    assert.match(sw, /flip-helper-v0\.6\.0/);
     assert.match(sw, /js\/core\/invite\.js/);
     assert.match(sw, /js\/ui\/terms\.js/);
   });

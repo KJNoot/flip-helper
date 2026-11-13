@@ -17,6 +17,8 @@ mkdirSync(SHOTS, { recursive: true });
 
 const mugPath = join(HERE, "fixtures/mug.png");
 const mug = "data:image/png;base64," + readFileSync(mugPath).toString("base64");
+const tablePath = join(HERE, "fixtures/table.jpg");
+const tableVideoPath = join(HERE, "fixtures/table.mp4");
 
 const srv = await serve(0);
 const base = `http://127.0.0.1:${srv.address().port}/index.html?nosw`;
@@ -214,6 +216,8 @@ try {
     assert.match(await text(), /Needs you to post/);
     assert.match(await text(), /Coming later/);
     assert.ok(await page.isVisible('[data-cta="scan"], a[href="#/scan"]'), "Buy or pass is on Home");
+    assert.ok(await page.isVisible('[data-cta="secondlook"], a[href="#/secondlook"]'), "Second look is on Home");
+    assert.match(await text(), /Second look: scan a table/);
     assert.match(await text(), /Taxes|taxes/);
     const stats = await page.$$eval(".stats .card.stat b", bs => bs.map(b => b.textContent.trim()));
     assert.equal(stats[0], "0");
@@ -241,7 +245,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Jessika's Flip Side v0\.5\.0/);
+    assert.match(await text(), /Jessika's Flip Side v0\.6\.0/);
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);
@@ -712,8 +716,254 @@ try {
     });
   });
 
+  const mockLook = {
+    items: [
+      {
+        name: "Speckled ceramic mug",
+        why: "A handmade-looking mug that often resells. This is a guess from the photo.",
+        priceLow: 12,
+        priceHigh: 22,
+        priceNote: "This is an estimate from the photo, not from checking sold listings.",
+        confidence: "medium",
+        frame: 1,
+        box: { x: 0.04, y: 0.1, w: 0.28, h: 0.55 },
+        where: "left side of the table, near the front",
+        whatToCheck: ["maker's mark on the bottom", "chips or cracks", "completeness"]
+      },
+      {
+        name: "Wooden picture frame",
+        why: "A sturdy wooden frame, sometimes worth a closer look. This is a guess from the photo.",
+        priceLow: 15,
+        priceHigh: 30,
+        priceNote: "This is an estimate from the photo, not from checking sold listings.",
+        confidence: "medium",
+        frame: 1,
+        box: { x: 0.35, y: 0.08, w: 0.32, h: 0.58 },
+        where: "middle of the table",
+        whatToCheck: ["condition of the corners", "glass or backing complete"]
+      },
+      {
+        name: "Navy canvas tote",
+        why: "A sturdy tote that can resell if the fabric is clean. This is a guess from the photo.",
+        priceLow: 10,
+        priceHigh: 20,
+        priceNote: "This is an estimate from the photo, not from checking sold listings.",
+        confidence: "low",
+        frame: 1,
+        box: { x: 0.66, y: 0.1, w: 0.3, h: 0.55 },
+        where: "right side of the table",
+        whatToCheck: ["brand tag", "stains", "straps intact"]
+      }
+    ],
+    skipped: [
+      { name: "stack of papers", reason: "everyday paper, likely low value" },
+      { name: "plastic bottle", reason: "common, low resale" }
+    ],
+    note: "A first pass from a wide photo. Check marks and condition yourself."
+  };
+
+  const fulfillLook = async (route, { delay = 0 } = {}) => {
+    if (delay) await new Promise(r => setTimeout(r, delay));
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        choices: [{ message: { content: JSON.stringify(mockLook) } }],
+        usage: { prompt_tokens: 10, completion_tokens: 10 }
+      })
+    });
+  };
+
+  await step("Second look: home button, no-key message, photo scan with a mocked AI, results and haggle", async () => {
+    // Fresh page so we don't fight the welcome video or leftover state.
+    const p3 = await context.newPage();
+    p3.setDefaultTimeout(20000);
+    p3.on("pageerror", e => { errors.push("pageerror sl: " + e.message); console.log("  sl page error:", e.message); });
+    const slBase = `http://127.0.0.1:${srv.address().port}/index.html?nosw&nointro&nowalk&noterms`;
+    await p3.goto(slBase);
+    await p3.waitForSelector("html[data-ready='1']");
+    await p3.evaluate(() => {
+      window.__flipFast = true;
+      window.__flipQuiet = true;
+      localStorage.setItem("flip-helper.introDone", "1");
+      localStorage.setItem("flip-helper.walkthroughDone", "1");
+    });
+    const shotSl = async (name, dest) => {
+      await p3.waitForTimeout(200);
+      await p3.evaluate(() => {
+        const t = document.querySelector("#toast");
+        if (t) { t.classList.remove("show"); t.textContent = ""; }
+      });
+      await p3.waitForTimeout(200);
+      const file = `${OUT}${String(++n).padStart(2, "0")}-${name}.png`;
+      await p3.screenshot({ path: file, fullPage: false });
+      if (dest) {
+        copyFileSync(file, join(SHOTS, dest));
+        console.log("  shot", dest);
+      }
+      return file;
+    };
+
+    await p3.evaluate(h => { location.hash = h; }, "#/home");
+    await p3.waitForTimeout(300);
+    assert.ok(await p3.isVisible('[data-cta="secondlook"]'), "Second look button on Home");
+    assert.ok(await p3.isVisible('[data-cta="add"]'), "Add is unchanged");
+    assert.ok(await p3.isVisible('[data-cta="scan"]'), "Buy or pass is unchanged");
+    await shotSl("v6-home", "v6-home.png");
+
+    // No key: kind message, does not crash.
+    await p3.evaluate(h => { location.hash = h; }, "#/secondlook");
+    await p3.waitForTimeout(300);
+    const startText = await p3.textContent("#view");
+    assert.match(startText, /Second look|second set of eyes/i);
+    assert.match(startText, /Paste the AI key|Settings first/i);
+    assert.match(startText, /only to the AI service|not uploaded anywhere else/i);
+    // File inputs are hidden; the big labels around them are the visible buttons.
+    assert.equal(await p3.locator("#sl-record").count(), 1);
+    assert.equal(await p3.locator("#sl-pick-video").count(), 1);
+    assert.equal(await p3.locator("#sl-take-photo").count(), 1);
+    assert.equal(await p3.locator("#sl-pick-photo").count(), 1);
+    assert.match(startText, /Record a slow pan/);
+    assert.match(startText, /Pick a video/);
+    assert.match(startText, /Take a wide photo/);
+    assert.match(startText, /Pick a photo/);
+
+    // Existing Buy or pass is still its own screen, unchanged.
+    await p3.evaluate(h => { location.hash = h; }, "#/scan");
+    await p3.waitForTimeout(250);
+    const scanText = await p3.textContent("#view");
+    assert.match(scanText, /Buy or pass/);
+    assert.match(scanText, /Identify and check/);
+    assert.doesNotMatch(scanText, /Second look: scan a table/);
+
+    // Photo path with a mocked AI. Delay the reply so we can screenshot "Looking…"
+    await p3.evaluate(() => localStorage.setItem("flip-helper.openai.apiKey", "sk-this-is-a-fake-test-key-not-real"));
+    await p3.route("https://api.openai.com/v1/chat/completions", route => fulfillLook(route, { delay: 1800 }));
+    await p3.evaluate(h => { location.hash = h; }, "#/secondlook");
+    await p3.waitForTimeout(300);
+    await p3.locator("#sl-pick-photo").setInputFiles(tablePath);
+    await p3.waitForSelector("#sl-running", { timeout: 8000 });
+    assert.match(await p3.textContent("#view"), /Looking|keep shopping/i);
+    await shotSl("v6-scanning", "v6-scanning.png");
+
+    // She can leave and see a progress banner on Home.
+    await p3.evaluate(h => { location.hash = h; }, "#/home");
+    await p3.waitForTimeout(250);
+    assert.ok(await p3.locator("#sl-banner, .sl-banner").count() > 0, "progress banner while browsing");
+    assert.match(await p3.textContent("body"), /Looking|keep shopping|second look/i);
+
+    await p3.waitForFunction(() => {
+      const j = window.__flip && window.__flip.secondLookJob;
+      return j && (j.status === "done" || j.status === "error");
+    }, { timeout: 20000 });
+    const job = await p3.evaluate(() => window.__flip.secondLookJob);
+    assert.equal(job.status, "done", job.error || "job should finish");
+    assert.ok(job.scanId);
+    await p3.evaluate(h => { location.hash = h; }, "#/secondlook/" + job.scanId);
+    await p3.waitForSelector("#sl-cards, #sl-results-head", { timeout: 8000 });
+    const res = await p3.textContent("#view");
+    assert.match(res, /Worth a closer look/);
+    assert.match(res, /Speckled ceramic mug/);
+    assert.match(res, /Wooden picture frame/);
+    assert.match(res, /Navy canvas tote/);
+    assert.match(res, /left side of the table/);
+    assert.match(res, /Estimate/);
+    assert.match(res, /What to check|maker/);
+    assert.match(res, /likely low value|plastic bottle|stack of papers/i);
+    assert.ok(await p3.isVisible('[data-act="closeup"]'));
+    assert.ok(await p3.isVisible('[data-act="haggle"]'));
+    assert.ok(await p3.isVisible('[data-act="dismiss"]'));
+    // Scans are saved locally.
+    const saved = await p3.evaluate(() => window.__flip.getScans());
+    assert.ok(saved.length >= 1);
+    assert.match(saved[0].items[0].name, /mug|frame|tote/i);
+    await shotSl("v6-results", "v6-results.png");
+
+    // A single card, close up.
+    const card = p3.locator(".sl-card").first();
+    await card.scrollIntoViewIfNeeded();
+    await shotSl("v6-card", "v6-card.png");
+
+    // Haggle helper: numbers, lines, bundle tip, Coming later on the earbud.
+    await p3.locator('[data-act="haggle"]').first().click();
+    await p3.waitForSelector("#sl-haggle, #sl-haggle-sheet");
+    const hag = await p3.textContent("#sl-haggle-sheet");
+    assert.match(hag, /Help me haggle/);
+    assert.match(hag, /Opening offer/);
+    assert.match(hag, /Fair price/);
+    assert.match(hag, /Walk away/);
+    assert.match(hag, /Would you take|could go|no pressure/i);
+    assert.match(hag, /Bundle tip/);
+    assert.match(hag, /Coming later/);
+    assert.match(hag, /earbud/i);
+    await shotSl("v6-haggle", "v6-haggle.png");
+    await p3.click('#sl-haggle-sheet [data-r="0"]');
+    await p3.waitForSelector("#sl-haggle-sheet", { state: "detached" });
+
+    // Take a close-up: existing Buy or pass, prefilled, not modified.
+    await p3.locator('[data-act="closeup"]').first().click();
+    await p3.waitForTimeout(400);
+    assert.match(await p3.evaluate(() => location.hash), /#\/scan/);
+    const closeup = await p3.textContent("#view");
+    assert.match(closeup, /Buy or pass/);
+    assert.match(closeup, /Speckled ceramic mug|Wooden picture frame|Navy canvas tote/);
+    assert.match(closeup, /Identify and check/);
+    assert.match(closeup, /Buy up to|Resale estimate|Estimate/);
+
+    await p3.unroute("https://api.openai.com/v1/chat/completions");
+    await p3.close();
+  });
+
+  await step("Second look: video scan with a mocked AI, and the looking state runs in the background", async () => {
+    const p4 = await context.newPage();
+    p4.setDefaultTimeout(25000);
+    p4.on("pageerror", e => { errors.push("pageerror slv: " + e.message); console.log("  slv page error:", e.message); });
+    const slBase = `http://127.0.0.1:${srv.address().port}/index.html?nosw&nointro&nowalk&noterms`;
+    await p4.goto(slBase);
+    await p4.waitForSelector("html[data-ready='1']");
+    await p4.evaluate(() => {
+      window.__flipFast = true;
+      window.__flipQuiet = true;
+      localStorage.setItem("flip-helper.introDone", "1");
+      localStorage.setItem("flip-helper.walkthroughDone", "1");
+      localStorage.setItem("flip-helper.openai.apiKey", "sk-this-is-a-fake-test-key-not-real");
+    });
+    await p4.route("https://api.openai.com/v1/chat/completions", route => fulfillLook(route, { delay: 400 }));
+    await p4.evaluate(h => { location.hash = h; }, "#/secondlook");
+    await p4.waitForTimeout(300);
+    await p4.locator("#sl-pick-video").setInputFiles(tableVideoPath);
+    await p4.waitForSelector("#sl-running, #sl-cards, #sl-results-head", { timeout: 20000 });
+    await p4.waitForFunction(() => {
+      const j = window.__flip && window.__flip.secondLookJob;
+      return j && (j.status === "done" || j.status === "error");
+    }, { timeout: 25000 });
+    const job = await p4.evaluate(() => window.__flip.secondLookJob);
+    assert.equal(job.status, "done", job && job.error);
+    assert.ok(job.scanId);
+    if (!await p4.locator("#sl-cards, #sl-results-head").count()) {
+      await p4.evaluate(h => { location.hash = h; }, "#/secondlook/" + job.scanId);
+      await p4.waitForSelector("#sl-cards, #sl-results-head");
+    }
+    const res = await p4.textContent("#view");
+    assert.match(res, /Worth a closer look/);
+    assert.match(res, /Speckled ceramic mug/);
+    assert.match(res, /Estimate/);
+    const scans = await p4.evaluate(() => window.__flip.getScans());
+    assert.ok(scans.some(s => s.kind === "video"));
+    // Dismiss a card.
+    const before = await p4.locator(".sl-card").count();
+    if (before) {
+      await p4.locator('[data-act="dismiss"]').first().click();
+      await p4.waitForTimeout(300);
+      const after = await p4.locator(".sl-card").count();
+      assert.ok(after === before - 1 || await p4.locator("#sl-dismissed").count(), "dismiss hides the card");
+    }
+    await p4.unroute("https://api.openai.com/v1/chat/completions");
+    await p4.close();
+  });
+
   if (errors.length) {
-    throw new Error("Page errors:\n" + errors.join("\n"));
+    throw new Error("Page errors:\\n" + errors.join("\\n"));
   }
   console.log("\nAll smoke steps passed. Screenshots in", OUT, "and", SHOTS);
 } finally {

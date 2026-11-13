@@ -9,8 +9,10 @@ import { renderItem } from "./ui/screens/item.js";
 import { renderItems } from "./ui/screens/items.js";
 import { renderSettings } from "./ui/screens/settings.js";
 import { renderScan } from "./ui/screens/scan.js";
+import { renderSecondLook, mountSecondLookBanner } from "./ui/screens/secondlook.js";
 import { renderTaxes } from "./ui/screens/taxes.js";
 import { renderCompat } from "./ui/screens/compat.js";
+import { getJob as getSecondLookJob, loadScans, startSecondLook, saveScan, clearSecondLook, getScan } from "./core/secondlook.js";
 import { badgeCount, attentionItems, shouldRemind, reminderBody, delistCountdown } from "./core/protect.js";
 import { getSettings, setReminder, getReminders } from "./core/settings.js";
 import { mountAskButton } from "./ui/ask.js";
@@ -21,7 +23,7 @@ import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.j
 import { shouldShowTermsGate, rememberInviteIfValid } from "./core/invite.js";
 import { openTerms, closeTerms, isTermsOpen } from "./ui/terms.js";
 
-export const VERSION = "0.5.0";
+export const VERSION = "0.6.0";
 
 const view = $("#view");
 const store = await createStore();
@@ -68,6 +70,7 @@ const SCREEN_NAMES = {
   item: "Item",
   settings: "Settings",
   scan: "Buy or pass",
+  secondlook: "Second look",
   taxes: "Taxes",
   sites: "Site limits",
   welcome: "Welcome",
@@ -78,7 +81,7 @@ function render() {
   const { head, rest } = parseHash();
   const tab = head === "item" ? "items"
     : (head === "taxes" ? "home"
-    : (head === "sites" ? "settings" : (head || "home")));
+    : (head === "sites" ? "settings" : (head === "secondlook" ? "home" : (head || "home"))));
   document.querySelectorAll(".tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === tab));
   ctx.screen = SCREEN_NAMES[head] || head;
   if (head === "item" && rest[0]) {
@@ -102,6 +105,8 @@ function render() {
     renderSettings(ctx, view);
   } else if (head === "scan") {
     renderScan(ctx, view);
+  } else if (head === "secondlook") {
+    renderSecondLook(ctx, view, rest[0] || "");
   } else if (head === "taxes") {
     renderTaxes(ctx, view, rest[0]);
   } else if (head === "sites") {
@@ -196,6 +201,7 @@ function afterIntro() {
 
 render();
 tickReminders();
+mountSecondLookBanner(ctx);
 
 // First-open: private invite may show terms first, then the welcome video
 // and try-it demo, then the short tips. Public visits (no token) skip terms.
@@ -252,6 +258,12 @@ window.__flip = {
   tickReminders,
   get scanWork() { return ctx.scanWork; },
   setScan(w) { ctx.scanWork = w; },
+  get secondLookJob() { return getSecondLookJob(); },
+  getScans: () => loadScans(),
+  getScan,
+  saveScan,
+  startSecondLook,
+  clearSecondLook,
   openIntro,
   closeIntro,
   isIntroOpen,
