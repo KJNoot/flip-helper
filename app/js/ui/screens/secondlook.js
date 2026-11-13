@@ -323,6 +323,7 @@ function paintCheck(ctx, el, scanId, itemId) {
         <li>
           <b>Find it.</b>
           <p>${esc(item.where || "on the table")}</p>
+          ${item.boxDropped || item.boxVerified === false ? `<p class="tiny muted">We couldn't pin the exact spot — look around this area.</p>` : ""}
           ${item.thumbDataUrl ? `<img class="sl-thumb" src="${esc(item.thumbDataUrl)}" alt="From the table scan">` : ""}
         </li>
         <li>

@@ -8,7 +8,8 @@
 // into one inventory, and skips people, work vehicles, trailers, fenders,
 // tires on trailers, straps, and racks.
 //
-// About three cents of the device-held key per look. Nothing is emailed.
+// About five cents of the device-held key per look (tiles to find things,
+// then a labeled grid and a yes/no verify to place the boxes). Nothing is emailed.
 
 import { chatJson, fileToDataUrl } from "./draft.js";
 import { getKey } from "./key.js";
@@ -21,9 +22,16 @@ import {
 } from "./secondlook.js";
 import { getSettings } from "./settings.js";
 import { getEnabledIds } from "./prefs.js";
+import {
+  locateAndVerify, drawLabeledGrid, requestGridLocate, requestBoxVerify,
+  applyVerifiedBoxes, cellsToBox, parseCell, parseCellRange, padBox,
+  mapLocalToPhoto, gridSpec, GRID_MAX_EDGE, GRID_PAD, GRID_SYSTEM, VERIFY_SYSTEM,
+  GRID_MAX_ITEMS, CROP_GRID, LOCATE_PROGRESS, VERIFY_PROGRESS, BOX_DROPPED_NOTE,
+  LOCATE_MODEL
+} from "./locate.js";
 
 export const LOOK_DEEPER_BUTTON = "Look deeper";
-export const LOOK_DEEPER_NOTE = "Takes a closer look at the full photo, in smaller pieces, so things in the back of a barn or a busy shot are less likely to be missed. Uses a bit more of your AI key (about three cents).";
+export const LOOK_DEEPER_NOTE = "Takes a closer look at the full photo, in smaller pieces, so things in the back of a barn or a busy shot are less likely to be missed. Uses a bit more of your AI key (about five cents).";
 export const LOOK_DEEPER_PROGRESS = "Looking more closely at this photo… you can keep shopping";
 export const LOOK_DEEPER_REFINE_PROGRESS = "Tightening the boxes so you can find each thing…";
 export const LOOK_DEEPER_MODEL = "gpt-4o";
@@ -596,10 +604,17 @@ export function groupRepeatLots(items, { quantity = "sum" } = {}) {
       priceNote: a.priceNote || named.priceNote,
       where: (a.where && a.where !== "on the table") ? a.where : (named.where || a.where),
       whatToCheck: checks.slice(0, 10),
-      box: a.boxRefined && !named.boxRefined ? a.box : (named.boxRefined && !a.boxRefined ? named.box : unionBox(a.box, named.box)),
+      box: (a.boxVerified && !named.boxVerified) ? a.box
+        : (named.boxVerified && !a.boxVerified) ? named.box
+        : (a.boxRefined && !named.boxRefined) ? a.box
+        : (named.boxRefined && !a.boxRefined) ? named.box
+        : unionBox(a.box, named.box),
       brand: a.brand || named.brand || "",
       confidence: a.confidence === "medium" || named.confidence === "medium" ? "medium" : (a.confidence || named.confidence),
       boxRefined: !!(a.boxRefined || named.boxRefined),
+      boxVerified: !!(a.boxVerified || named.boxVerified),
+      boxDropped: a.boxVerified || named.boxVerified ? false : !!(a.boxDropped && named.boxDropped),
+      boxStatus: a.boxVerified ? a.boxStatus : (named.boxVerified ? named.boxStatus : (a.boxStatus || named.boxStatus)),
       lookedDeeper: !!(a.lookedDeeper || named.lookedDeeper),
       sourceScanIds: Array.from(new Set([...(a.sourceScanIds || []), ...(named.sourceScanIds || [])]))
     };
@@ -872,6 +887,87 @@ export async function cropsForRefine(file, items, packed, { max = LOOK_DEEPER_MA
   return crops;
 }
 
+
+/** Crop each item's padded grid box from the upright photo, for the verify pass. */
+export async function cropsForLocate(file, items, packed, { pad = GRID_PAD, max = GRID_MAX_ITEMS } = {}) {
+  const list = (items || []).slice(0, max);
+  if (!list.length) return [];
+  let source = null;
+  let W, H;
+  if (file && typeof document !== "undefined") {
+    try {
+      source = await decodeUpright(file);
+      W = source.width || source.naturalWidth;
+      H = source.height || source.naturalHeight;
+    } catch (e) { source = null; }
+  }
+  const crops = [];
+  for (const [i, it] of list.entries()) {
+    const seed = it.gridBox || it.box;
+    if (!seed || it.locateMissing) {
+      crops.push({ index: i + 1, name: it.name, frac: null, dataUrl: "", width: 0, height: 0 });
+      continue;
+    }
+    const frac = padBox(seed, pad);
+    let dataUrl = "", width = 0, height = 0;
+    if (source && W && H && frac) {
+      const cut = drawCrop(
+        source,
+        Math.round(frac.x * W), Math.round(frac.y * H),
+        Math.max(1, Math.round(frac.w * W)), Math.max(1, Math.round(frac.h * H)),
+        1024, 0.88
+      );
+      dataUrl = cut.dataUrl;
+      width = cut.width;
+      height = cut.height;
+      if (typeof document !== "undefined" && dataUrl) {
+        try {
+          const img = await decodeUpright(dataUrl);
+          const gridded = drawLabeledGrid(img, { maxEdge: 1024, quality: 0.88, spec: CROP_GRID });
+          try { if (img.close) img.close(); } catch (e) { /* Image has no close */ }
+          if (gridded && gridded.dataUrl) {
+            dataUrl = gridded.dataUrl;
+            width = gridded.width;
+            height = gridded.height;
+          }
+        } catch (e) { /* keep the ungridded crop; verify will fall back to the padded region */ }
+      }
+    } else if (packed && packed.overview && packed.overview.dataUrl && frac) {
+      dataUrl = packed.overview.dataUrl;
+      width = packed.overview.width;
+      height = packed.overview.height;
+    }
+    crops.push({
+      index: i + 1,
+      name: it.name,
+      brand: it.brand || "",
+      frac,
+      dataUrl,
+      width,
+      height,
+      cropSpec: CROP_GRID
+    });
+  }
+  try { if (source && source.close) source.close(); } catch (e) { /* Image has no close */ }
+  return crops;
+}
+
+/** Draw a labeled grid on the upright photo (or the overview as a fallback). */
+export async function gridImageFromPhoto(file, packed, { maxEdge = GRID_MAX_EDGE } = {}) {
+  if (typeof document === "undefined") return (packed && packed.gridImage) || null;
+  let source = null;
+  try {
+    if (file) source = await decodeUpright(file);
+  } catch (e) { source = null; }
+  if (!source && packed && packed.overview && packed.overview.dataUrl) {
+    try { source = await decodeUpright(packed.overview.dataUrl); } catch (e) { source = null; }
+  }
+  if (!source) return (packed && packed.gridImage) || null;
+  const drawn = drawLabeledGrid(source, { maxEdge });
+  try { if (source.close) source.close(); } catch (e) { /* Image has no close */ }
+  return drawn;
+}
+
 /* ---------- API ---------- */
 
 export function deeperUserText(tiles, { grid = LOOK_DEEPER_GRID } = {}) {
@@ -986,7 +1082,9 @@ function addUsage(a, b) {
  * caller does.
  */
 export async function runLookDeeper({
-  file, scan, key, fetchImpl, chatImpl, refineImpl, cropFn, tiles: readyTiles, onProgress, cancelled
+  file, scan, key, fetchImpl, chatImpl, refineImpl, cropFn, tiles: readyTiles,
+  locateImpl, verifyImpl, locateAndVerifyImpl, skipLocate, gridImage,
+  onProgress, cancelled
 } = {}) {
   if (cancelled && cancelled()) {
     const err = new Error("Cancelled.");
@@ -1013,26 +1111,62 @@ export async function runLookDeeper({
   });
   let items = result.items || [];
   let refineUsage = null;
-  const toRefine = items.filter(it => it.needsRefine !== false).slice(0, LOOK_DEEPER_MAX_REFINE);
-  if (toRefine.length) {
+  // Prefer grid-cell locate + a yes/no verify. This replaces the old
+  // crop-and-tighten refine, which often tightened a box that was already
+  // on the wrong wall. In Node tests without a document, we fall back to
+  // the previous refine path when a refineImpl is provided.
+  const canDraw = typeof document !== "undefined" || gridImage || (packed && packed.gridImage);
+  const wantLocate = !skipLocate && items.length && (locateImpl || locateAndVerifyImpl || canDraw);
+  if (wantLocate) {
     if (cancelled && cancelled()) {
       const err = new Error("Cancelled.");
       err.code = "cancelled";
       throw err;
     }
     try {
-      if (onProgress) onProgress({ stage: "refine", progress: LOOK_DEEPER_REFINE_PROGRESS });
-      const crops = await cropsForRefine(file, items.slice(0, LOOK_DEEPER_MAX_REFINE), packed);
-      const usable = crops.filter(c => c.dataUrl);
-      if (usable.length) {
-        const refine = refineImpl || requestBoxRefine;
-        const refined = await refine({ crops: usable, key, fetchImpl });
-        refineUsage = refined && refined.usage;
-        items = applyRefinedBoxes(items, refined && refined.boxes, crops);
-      }
+      if (onProgress) onProgress({ stage: "locate", progress: LOCATE_PROGRESS });
+      const grid = gridImage || (packed && packed.gridImage) || await gridImageFromPhoto(file, packed);
+      const locFn = locateAndVerifyImpl || locateAndVerify;
+      const located = await locFn({
+        items,
+        gridImage: grid,
+        makeCrops: list => cropsForLocate(file, list, packed),
+        key,
+        fetchImpl,
+        locateImpl,
+        verifyImpl,
+        cancelled
+      });
+      if (located && located.items) items = located.items;
+      refineUsage = located && located.usage;
     } catch (e) {
-      // A failed refine must not lose the items we already found.
       if (e && e.code === "cancelled") throw e;
+      // A failed locate must not lose the items we already found. Drop
+      // untrusted first-pass boxes rather than showing a wrong one.
+      items = items.map(it => ({ ...it, box: null, boxDropped: true, boxVerified: false, boxStatus: "unknown", thumbDataUrl: "" }));
+    }
+  } else {
+    const toRefine = items.filter(it => it.needsRefine !== false).slice(0, LOOK_DEEPER_MAX_REFINE);
+    if (toRefine.length) {
+      if (cancelled && cancelled()) {
+        const err = new Error("Cancelled.");
+        err.code = "cancelled";
+        throw err;
+      }
+      try {
+        if (onProgress) onProgress({ stage: "refine", progress: LOOK_DEEPER_REFINE_PROGRESS });
+        const crops = await cropsForRefine(file, items.slice(0, LOOK_DEEPER_MAX_REFINE), packed);
+        const usable = crops.filter(c => c.dataUrl);
+        if (usable.length) {
+          const refine = refineImpl || requestBoxRefine;
+          const refined = await refine({ crops: usable, key, fetchImpl });
+          refineUsage = refined && refined.usage;
+          items = applyRefinedBoxes(items, refined && refined.boxes, crops);
+        }
+      } catch (e) {
+        // A failed refine must not lose the items we already found.
+        if (e && e.code === "cancelled") throw e;
+      }
     }
   }
   const first = (scan && scan.items) || [];
@@ -1054,7 +1188,7 @@ export async function runLookDeeper({
   const siteIds = getEnabledSafe();
   const decorated = (withThumbs.items || []).map(it => {
     const d = decorateItem(it, { desiredProfit: settings.desiredProfit, siteIds });
-    return { ...d, lookedDeeper: true, boxRefined: !!it.boxRefined, quantity: it.quantity, brand: it.brand || d.brand || "" };
+    return { ...d, lookedDeeper: true, boxRefined: !!it.boxRefined, boxVerified: !!it.boxVerified, boxDropped: !!it.boxDropped, boxStatus: it.boxStatus || "", boxCentered: !!it.boxCentered, cells: it.cells || "", quantity: it.quantity, brand: it.brand || d.brand || "" };
   });
   return {
     items: decorated,
@@ -1086,7 +1220,8 @@ export function deeperReadyLabel(scan) {
  * recent photos look like the same load) combine them into one inventory.
  */
 export async function startLookDeeper({
-  scanId, file, key, fetchImpl, chatImpl, refineImpl, cropFn, onProgress, auto, storage, tiles
+  scanId, file, key, fetchImpl, chatImpl, refineImpl, cropFn, onProgress, auto, storage, tiles,
+  locateImpl, verifyImpl, locateAndVerifyImpl, skipLocate, gridImage
 } = {}) {
   if (getJob() && getJob().status === "running") {
     const err = new Error(MSG_BUSY);
@@ -1140,6 +1275,11 @@ export async function startLookDeeper({
       refineImpl,
       cropFn,
       tiles,
+      locateImpl,
+      verifyImpl,
+      locateAndVerifyImpl,
+      skipLocate,
+      gridImage,
       onProgress: p => {
         setJob({
           ...getJob(),
@@ -1223,3 +1363,10 @@ export async function startLookDeeper({
 }
 
 export { MSG_NETWORK };
+
+export {
+  locateAndVerify, drawLabeledGrid, requestGridLocate, requestBoxVerify,
+  applyVerifiedBoxes, cellsToBox, parseCell, parseCellRange, padBox,
+  mapLocalToPhoto, gridSpec, GRID_SYSTEM, VERIFY_SYSTEM, BOX_DROPPED_NOTE,
+  LOCATE_PROGRESS, GRID_MAX_EDGE
+};

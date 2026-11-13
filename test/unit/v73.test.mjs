@@ -27,7 +27,7 @@ function luma(data, i) {
   return 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
 }
 
-describe("v0.7.3 auto exposure, white balance, contrast and levels", () => {
+describe("v0.7.4 auto exposure, white balance, contrast and levels", () => {
   it("lifts a dark photo toward mid brightness without blowing highlights", () => {
     const w = 32, h = 32;
     const src = rgba(w, h, (x, y) => {
@@ -70,7 +70,7 @@ describe("v0.7.3 auto exposure, white balance, contrast and levels", () => {
   });
 });
 
-describe("v0.7.3 gentle denoise and unsharp mask", () => {
+describe("v0.7.4 gentle denoise and unsharp mask", () => {
   it("denoise smooths speckles but keeps a hard edge", () => {
     const w = 20, h = 20;
     const src = rgba(w, h, (x, y) => {
@@ -106,7 +106,7 @@ describe("v0.7.3 gentle denoise and unsharp mask", () => {
   });
 });
 
-describe("v0.7.3 portrait blur, crop, and no upscale", () => {
+describe("v0.7.4 portrait blur, crop, and no upscale", () => {
   it("blurs the background but leaves subject pixels unchanged", () => {
     const w = 32, h = 32;
     const src = rgba(w, h, (x, y) => {
@@ -222,17 +222,17 @@ describe("v0.7.3 portrait blur, crop, and no upscale", () => {
   });
 });
 
-describe("v0.7.3 wiring: Enhance is the default, white cutout is secondary", () => {
-  it("bumps the app to 0.7.3 and caches enhance.js", () => {
+describe("v0.7.4 wiring: Enhance is the default, white cutout is secondary", () => {
+  it("bumps the app to 0.7.4 and caches enhance.js", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.7.3");
+    assert.equal(pkg.version, "0.7.4");
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.7\.3"/);
+    assert.match(main, /export const VERSION = "0\.7\.4"/);
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.7\.3/);
+    assert.match(sw, /flip-helper-v0\.7\.4/);
     assert.match(sw, /js\/core\/enhance\.js/);
     const readme = readFileSync(join(root, "README.md"), "utf8");
-    assert.match(readme, /0\.7\.3/);
+    assert.match(readme, /0\.7\.4/);
     assert.match(readme, /Enhance/);
   });
 

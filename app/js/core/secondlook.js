@@ -420,6 +420,11 @@ export function normalizeLookItem(raw, index = 0, frames = []) {
     lookedDeeper: !!raw.lookedDeeper,
     tile: raw.tile != null && Number.isFinite(Number(raw.tile)) ? Number(raw.tile) : undefined,
     boxRefined: !!raw.boxRefined,
+    boxVerified: !!raw.boxVerified,
+    boxDropped: !!raw.boxDropped,
+    boxStatus: raw.boxStatus ? String(raw.boxStatus) : undefined,
+    boxCentered: !!raw.boxCentered,
+    cells: raw.cells ? String(raw.cells) : undefined,
     sourceScanIds: Array.isArray(raw.sourceScanIds) ? raw.sourceScanIds.map(String) : undefined
   };
 }
@@ -881,7 +886,7 @@ export function lookCardHtml(item, { showActions = true } = {}) {
     : `<div class="sl-thumb sl-thumb-ph" aria-hidden="true">👀</div>`;
 
   const steps = `<ol class="sl-steps">
-    <li><b>Find it.</b> ${esc(it.where || "on the table")}</li>
+    <li><b>Find it.</b> ${esc(it.where || "on the table")}${it.boxDropped || it.boxVerified === false ? ` <span class="tiny muted">We couldn't pin the exact spot — look around this area.</span>` : (it.boxStatus === "approximate" ? ` <span class="tiny muted">Approximate area — look around this part of the photo.</span>` : "")}</li>
     <li><b>Check.</b> ${checks ? `<ul>${checks}</ul>` : "Look it over for marks, tags, and condition."}</li>
     <li><b>Snap a close photo</b> of just this item, and of any mark, tag or label.</li>
   </ol>`;
@@ -1199,6 +1204,13 @@ export async function attachThumbs(result, frames, cropFn) {
   for (const item of (result && result.items) || []) {
     const frame = frameByIndex(frames, item.frame);
     let thumb = item.thumbDataUrl || "";
+    // A dropped or unverified box must not produce a thumbnail — that
+    // crop was on the wrong wall, floor, or ceiling.
+    const skipCrop = item.boxDropped || item.boxVerified === false || !item.box;
+    if (skipCrop && item.lookedDeeper) {
+      items.push({ ...item, thumbDataUrl: thumb || "" });
+      continue;
+    }
     if (!thumb && frame && (frame.dataUrl || frame) && cropFn) {
       try { thumb = await cropFn(frame.dataUrl || frame, item.box, { width: frame.width, height: frame.height }); }
       catch (e) { thumb = frame.dataUrl || ""; }

@@ -42,7 +42,7 @@ function mockFetch(json, capture) {
   };
 }
 
-describe("v0.7.3 photoTiles: 3×3 overlapping grid", () => {
+describe("v0.7.4 photoTiles: 3×3 overlapping grid", () => {
   it("splits a wide photo into 9 overlapping tiles that cover every pixel", () => {
     const { tiles, grid, overlap, width, height } = photoTiles(3000, 2000);
     assert.equal(grid, 3);
@@ -80,7 +80,7 @@ describe("v0.7.3 photoTiles: 3×3 overlapping grid", () => {
   });
 });
 
-describe("v0.7.3 map boxes from tile space in code", () => {
+describe("v0.7.4 map boxes from tile space in code", () => {
   it("maps a local tile box into photo space without trusting the model to convert", () => {
     const tile = { x: 0.3, y: 0.3, w: 0.4, h: 0.4 };
     const local = { x: 0.25, y: 0.5, w: 0.5, h: 0.25 };
@@ -167,7 +167,7 @@ describe("v0.7.3 map boxes from tile space in code", () => {
   });
 });
 
-describe("v0.7.3 shouldLookDeeper: auto on busy empty frames, not tight tables", () => {
+describe("v0.7.4 shouldLookDeeper: auto on busy empty frames, not tight tables", () => {
   it("auto-runs when the cheap pass found nothing", () => {
     assert.equal(shouldLookDeeper({ items: [], skipped: [] }), true);
     assert.equal(shouldLookDeeper({ items: [], skipped: [{ name: "clutter" }] }), true);
@@ -193,7 +193,7 @@ describe("v0.7.3 shouldLookDeeper: auto on busy empty frames, not tight tables",
   });
 });
 
-describe("v0.7.3 ignore people, work vehicles, trailers, fenders, trailer tires, straps, racks", () => {
+describe("v0.7.4 ignore people, work vehicles, trailers, fenders, trailer tires, straps, racks", () => {
   it("drops the work truck, trailer, fender, trailer tires, straps, and racks from set2", () => {
     const junk = [
       { name: "Pickup truck", brand: "GMC", where: "back of the truck", why: "A work truck." },
@@ -246,7 +246,7 @@ describe("v0.7.3 ignore people, work vehicles, trailers, fenders, trailer tires,
   });
 });
 
-describe("v0.7.3 brands attached to the right object, and not a product type", () => {
+describe("v0.7.4 brands attached to the right object, and not a product type", () => {
   it("strips BENCHTOP as a brand and keeps real brands", () => {
     assert.equal(cleanBrand("Benchtop", "Benchtop miter saw"), "");
     assert.equal(cleanBrand("BENCHTOP", "miter saw"), "");
@@ -277,7 +277,7 @@ describe("v0.7.3 brands attached to the right object, and not a product type", (
   });
 });
 
-describe("v0.7.3 correct names and counted lots", () => {
+describe("v0.7.4 correct names and counted lots", () => {
   it("renames 'white sinks' to vanity tops", () => {
     assert.match(preferredName("White sinks"), /vanity tops/i);
     assert.match(preferredName("6 white sinks"), /^6 vanity tops/i);
@@ -309,7 +309,7 @@ describe("v0.7.3 correct names and counted lots", () => {
   });
 });
 
-describe("v0.7.3 several photos of the same load merge into one inventory", () => {
+describe("v0.7.4 several photos of the same load merge into one inventory", () => {
   function scan(id, items, at) {
     return normalizeScan({ id, kind: "photo", createdAt: at, items, skipped: [], note: "", unread: false });
   }
@@ -381,7 +381,7 @@ describe("v0.7.3 several photos of the same load merge into one inventory", () =
   });
 });
 
-describe("v0.7.3 merge deeper findings with the cheap first pass", () => {
+describe("v0.7.4 merge deeper findings with the cheap first pass", () => {
   it("keeps first-pass items and adds new deeper ones, preferring deeper brands", () => {
     const first = [{ id: "li_1", name: "Decorative Sink", priceLow: 80, priceHigh: 150, confidence: "low", where: "center" }];
     const deeper = [{ name: "Decorative ceramic sink", brand: "Pfister", priceLow: 100, priceHigh: 200, confidence: "medium", where: "center", box: { x: 0.2, y: 0.3, w: 0.6, h: 0.4 }, lookedDeeper: true }];
@@ -403,7 +403,7 @@ describe("v0.7.3 merge deeper findings with the cheap first pass", () => {
   });
 });
 
-describe("v0.7.3 requestLookDeeper talks to gpt-4o at detail high", () => {
+describe("v0.7.4 requestLookDeeper talks to gpt-4o at detail high", () => {
   it("sends tiles + overview to gpt-4o with detail high, and never puts the key in the body", async () => {
     const capture = [];
     const layout = photoTiles(900, 900);
@@ -477,7 +477,7 @@ describe("v0.7.3 requestLookDeeper talks to gpt-4o at detail high", () => {
   });
 });
 
-describe("v0.7.3 startLookDeeper updates a scan and can merge a load", () => {
+describe("v0.7.4 startLookDeeper updates a scan and can merge a load", () => {
   it("runs on a stored photo, writes lookedDeeper, and combines a recent same-load scan", async () => {
     const storage = memStore();
     clearSecondLook(storage);
@@ -555,14 +555,14 @@ describe("v0.7.3 startLookDeeper updates a scan and can merge a load", () => {
   });
 });
 
-describe("v0.7.3 wiring, UI, version, and service worker", () => {
-  it("bumps the app to 0.7.3, caches lookdeeper.js, and wires a Look deeper button", () => {
+describe("v0.7.4 wiring, UI, version, and service worker", () => {
+  it("bumps the app to 0.7.4, caches lookdeeper.js, and wires a Look deeper button", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.7.3");
+    assert.equal(pkg.version, "0.7.4");
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.7\.3"/);
+    assert.match(main, /export const VERSION = "0\.7\.4"/);
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.7\.3/);
+    assert.match(sw, /flip-helper-v0\.7\.4/);
     assert.match(sw, /js\/core\/lookdeeper\.js/);
     assert.doesNotMatch(sw, /\.onnx/);
     const ui = readFileSync(join(root, "app/js/ui/screens/secondlook.js"), "utf8");
@@ -573,14 +573,14 @@ describe("v0.7.3 wiring, UI, version, and service worker", () => {
     assert.match(ui, /maybeAutoLookDeeper/);
     assert.match(ui, /data-act="lookdeeper"/);
     assert.equal(LOOK_DEEPER_BUTTON, "Look deeper");
-    assert.match(LOOK_DEEPER_NOTE, /three cents/);
+    assert.match(LOOK_DEEPER_NOTE, /five cents/);
     assert.equal(LOOK_DEEPER_MODEL, "gpt-4o");
     assert.equal(LOOK_DEEPER_DETAIL, "high");
     assert.equal(LOOK_DEEPER_GRID, 3);
     assert.equal(LOOK_DEEPER_OVERLAP, 0.10);
     assert.ok(LOOK_DEEPER_MAX_PHOTOS >= 10);
     const readme = readFileSync(join(root, "README.md"), "utf8");
-    assert.match(readme, /0\.7\.3/);
+    assert.match(readme, /0\.7\.4/);
     assert.match(readme, /Look deeper/);
     assert.match(MSG_NEED_PHOTO, /scan this photo again/);
     assert.match(REFINE_SYSTEM, /Exclude floor/);
@@ -609,7 +609,7 @@ describe("v0.7.3 wiring, UI, version, and service worker", () => {
   });
 });
 
-describe("v0.7.3 set2-style mapDeeperItems filters and groups a trailer load", () => {
+describe("v0.7.4 set2-style mapDeeperItems filters and groups a trailer load", () => {
   it("turns a raw deeper response like set2 photo 4–8 into for-sale lots", () => {
     const layout = photoTiles(4000, 3000);
     const raw = {

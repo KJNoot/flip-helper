@@ -230,7 +230,7 @@ describe("privacy: no personal data or invite token in the public repo", () => {
   });
   it("service worker caches the new terms modules under the current version", () => {
     const sw = readFileSync(join(APP, "sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.7\.3/);
+    assert.match(sw, /flip-helper-v0\.7\.4/);
     assert.match(sw, /js\/core\/invite\.js/);
     assert.match(sw, /js\/ui\/terms\.js/);
   });
