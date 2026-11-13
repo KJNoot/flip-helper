@@ -30,11 +30,12 @@ self.onmessage = async ev => {
     if (msg.type === "infer") {
       if (!session) throw new Error("studio: model is not ready");
       const tensor = msg.tensor;
-      const feeds = { "input.1": new ort.Tensor("float32", tensor, [1, 3, 320, 320]) };
+      const size = msg.size || Math.round(Math.sqrt((tensor.length || 0) / 3)) || 320;
+      const feeds = { "input.1": new ort.Tensor("float32", tensor, [1, 3, size, size]) };
       const out = await session.run(feeds);
       const pred = out[session.outputNames[0]];
       const mask = pred.data instanceof Float32Array ? pred.data : Float32Array.from(pred.data);
-      self.postMessage({ id, type: "mask", mask, width: 320, height: 320 }, [mask.buffer]);
+      self.postMessage({ id, type: "mask", mask, width: size, height: size }, [mask.buffer]);
       return;
     }
     throw new Error("studio: unknown worker message");

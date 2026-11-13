@@ -160,20 +160,27 @@ describe("v0.7.0 studio photo math", () => {
     const m = rectMask(100, 80, 5, 10, 25, 30); // 20×20 box at (5,10)
     const b = foregroundBounds(m, 100, 80, { threshold: 0.5 });
     assert.deepEqual(b, { x: 5, y: 10, w: 20, h: 20 });
+    // Default: never enlarge past the source pixels. A 20×20 item in a
+    // 200×200 frame stays 20×20, with more padding, not a 8× blow-up.
     const xf = centerTransform(b, 200, 200, 0.10);
-    // 10% pad → 160 available, scale = 160/20 = 8, dest 160×160, origin 20,20
-    assert.equal(xf.scale, 8);
-    assert.equal(xf.dstW, 160);
-    assert.equal(xf.dstH, 160);
-    assert.equal(xf.dstX, 20);
-    assert.equal(xf.dstY, 20);
+    assert.equal(xf.scale, 1);
+    assert.equal(xf.dstW, 20);
+    assert.equal(xf.dstH, 20);
+    assert.equal(xf.dstX, 90);
+    assert.equal(xf.dstY, 90);
     // Even padding on all sides.
     assert.equal(xf.dstX, 200 - xf.dstX - xf.dstW);
     assert.equal(xf.dstY, 200 - xf.dstY - xf.dstH);
+    // The old "fill the padded frame" scale is still available when asked for.
+    const uncapped = centerTransform(b, 200, 200, 0.10, { maxScale: Infinity });
+    assert.equal(uncapped.scale, 8);
+    assert.equal(uncapped.dstW, 160);
+    assert.equal(uncapped.dstX, 20);
     // Portrait frame: same even left/right, same even top/bottom (may differ from L/R).
     const tall = centerTransform(b, 160, 200, 0.10);
     assert.ok(Math.abs(tall.dstX - (160 - tall.dstX - tall.dstW)) < 1e-9);
     assert.ok(Math.abs(tall.dstY - (200 - tall.dstY - tall.dstH)) < 1e-9);
+    assert.ok(tall.scale <= 1);
   });
 
   it("caps a 12MP working size to 2048 on the long edge", () => {
@@ -221,9 +228,9 @@ describe("v0.7.0 studio photo math", () => {
     }
     // Center should be the red item, not green.
     const mid = at(out.data, 80, 40, 40);
-    assert.ok(mid[0] > 150 && mid[1] < 80, `center ${mid}`);
-    // Green background must be gone.
-    assert.ok(mid[1] < 80);
+    assert.ok(mid[0] > 150 && mid[1] < 130 && mid[0] > mid[1], `center ${mid}`);
+    // Green background must be gone (the item is red, not a green leftover).
+    assert.ok(mid[1] < 130 && mid[0] > mid[1], `green leftover? ${mid}`);
   });
 
   it("lays a soft drop shadow below the item, not above, and only on a studio background", () => {
@@ -453,7 +460,7 @@ describe("v0.7.0 studio photo math", () => {
     assert.equal(result.kind, "studio");
     assert.equal(result.width, 50);
     const mid = at(result.data, 50, 25, 25);
-    assert.ok(mid[0] > 140 && mid[1] < 90, `center ${mid}`);
+    assert.ok(mid[0] > 140 && mid[1] < 140 && mid[0] > mid[1], `center ${mid}`);
   });
 
   it("keeps the original pixels when a studio photo is applied, and can restore them", () => {
@@ -504,13 +511,13 @@ describe("v0.7.0 studio photo math", () => {
 
 
 describe("v0.7.0 wiring, version, and service worker", () => {
-  it("bumps the app, package, and service worker to v0.7.0 and caches studio modules but not the model", () => {
+  it("bumps the app, package, and service worker to v0.7.1 and caches studio modules but not the model", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.7.0");
+    assert.equal(pkg.version, "0.7.1");
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.7\.0"/);
+    assert.match(main, /export const VERSION = "0\.7\.1"/);
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.7\.0/);
+    assert.match(sw, /flip-helper-v0\.7\.1/);
     assert.match(sw, /js\/core\/studio\.js/);
     assert.match(sw, /js\/core\/segment\.js/);
     assert.match(sw, /js\/core\/studio-worker\.js/);
