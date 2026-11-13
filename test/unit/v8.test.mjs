@@ -946,3 +946,34 @@ describe("v0.8.0 version and service worker", () => {
     assert.match(readme, /never uploaded/);
   });
 });
+
+describe("v0.8.0 delete is a tombstone", () => {
+  it("a delete is a tombstone, so the other device drops the item instead of it coming back", async () => {
+    const world = new FakeWorld();
+    const phone = world.client();
+    const computer = world.client();
+    await turnOnSync({ sb: phone, storage: mem() });
+    const code = await createPairingCode({ sb: phone });
+    await joinWithCode(code.code, { sb: computer, storage: mem() });
+    const aStore = memStore([{ id: "mug", title: "Mug", updatedAt: 10, createdAt: 10, photos: [] }]);
+    const phoneMem = mem();
+    await runSync({ store: aStore, sb: phone, storage: phoneMem });
+    const bStore = memStore([]);
+    const compMem = mem();
+    await runSync({ store: bStore, sb: computer, storage: compMem });
+    assert.equal((await bStore.get("mug")).title, "Mug");
+
+    // This is what ctx.remove now does: tombstone, then drop locally, then sync.
+    const { noteLocalChange } = await import("../../app/js/core/sync.js");
+    await noteLocalChange({ kind: "item", id: "mug", action: "delete", at: 50, auto: false }, { storage: phoneMem });
+    await aStore.remove("mug");
+    const r = await runSync({ store: aStore, sb: phone, storage: phoneMem });
+    assert.equal(r.ok, true);
+    assert.ok(world.items.some(row => row.id === "mug" && row.deleted_at));
+
+    const r2 = await runSync({ store: bStore, sb: computer, storage: compMem });
+    assert.equal(r2.ok, true);
+    assert.equal(await bStore.get("mug"), null);
+    assert.equal((await bStore.all()).length, 0);
+  });
+});
