@@ -63,10 +63,10 @@ describe("welcome / intro flags", () => {
       matchMedia: q => ({ matches: String(q).includes("standalone") })
     }), true);
   });
-  it("shows a placeholder until the intro video is actually present", () => {
+  it("ships the reviewed intro video and falls back to a poster if it fails", () => {
     assert.equal(INTRO_VIDEO, "media/intro.mp4");
     assert.equal(INTRO_POSTER, "media/intro-poster.jpg");
-    assert.equal(INTRO_VIDEO_READY, false, "video is not shipped until Ken reviews it");
+    assert.equal(INTRO_VIDEO_READY, true, "v0.4.1 ships the reviewed welcome video");
     assert.equal(introVideoState({ ready: false }).mode, "placeholder");
     assert.equal(introVideoState({ exists: false }).mode, "placeholder");
     assert.equal(introVideoState({ exists: false }).label, VIDEO_COMING_SOON);
@@ -77,11 +77,9 @@ describe("welcome / intro flags", () => {
     const poster = join(APP, INTRO_POSTER);
     assert.equal(existsSync(poster), true, "poster should be in the app");
     assert.ok(statSync(poster).size < 500_000);
-    // The video itself is optional until Ken approves it — do not require it.
     const video = join(APP, INTRO_VIDEO);
-    if (existsSync(video)) {
-      assert.ok(statSync(video).size <= INTRO_MAX_BYTES, "intro.mp4 must stay under ~15 MB");
-    }
+    assert.equal(existsSync(video), true, "intro.mp4 should be in the app");
+    assert.ok(statSync(video).size <= INTRO_MAX_BYTES, "intro.mp4 must stay under ~15 MB");
   });
 });
 
@@ -263,7 +261,7 @@ describe("double normalizeDraft (Apply on a draft) keeps site advice", () => {
 describe("service worker does not precache the intro video", () => {
   it("lists the poster and samples, skips intro.mp4, and skips runtime caching of mp4", () => {
     const sw = readFileSync(join(APP, "sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.4\.0/);
+    assert.match(sw, /flip-helper-v0\.4\.1/);
     assert.match(sw, /media\/intro-poster\.jpg/);
     assert.match(sw, /media\/samples\/mug\.jpg/);
     assert.doesNotMatch(sw, /media\/intro\.mp4/);

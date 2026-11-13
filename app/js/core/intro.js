@@ -6,7 +6,7 @@ export const INTRO_KEY = "flip-helper.introDone";
 export const INTRO_VIDEO = "media/intro.mp4";
 // Flip this to true when app/media/intro.mp4 is dropped in (tools/import-intro-video.sh does it).
 // Kept false so a missing file is not requested on every first open.
-export const INTRO_VIDEO_READY = false;
+export const INTRO_VIDEO_READY = true;
 export const INTRO_POSTER = "media/intro-poster.jpg";
 export const VIDEO_COMING_SOON = "Video coming soon";
 export const INTRO_MAX_BYTES = 15 * 1024 * 1024;

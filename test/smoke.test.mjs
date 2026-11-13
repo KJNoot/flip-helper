@@ -76,16 +76,24 @@ try {
   await page.evaluate(() => { window.__flipFast = true; });
   const intro = () => page.textContent("#intro-root");
 
-  await step("first-open welcome plays a placeholder video and offers a try-it demo", async () => {
+  await step("first-open welcome plays the intro video and offers a try-it demo", async () => {
     await page.waitForSelector("#intro-root");
     assert.ok(await page.isVisible("#intro-root"), "welcome opens on first open");
     assert.match(await intro(), /Jessika.?s/);
     assert.match(await intro(), /Flip Side/);
-    assert.match(await intro(), /Video coming soon/);
+    // Wait for the lazy-loaded promo to replace the placeholder.
+    await page.waitForFunction(() => {
+      const v = document.querySelector("#intro-vid");
+      return v && !v.hidden && v.readyState >= 2;
+    }, { timeout: 15000 });
+    assert.ok(await page.isVisible("#intro-vid"), "welcome plays the intro video");
+    const src = await page.getAttribute("#intro-vid", "src");
+    assert.match(src || "", /media\/intro\.mp4/);
+    assert.equal(await page.isVisible("#intro-ph"), false, "placeholder is hidden once the video is ready");
+    assert.ok(await page.isVisible('#intro-root [data-act="sound"]'), "tap-for-sound");
     assert.ok(await page.isVisible('#intro-root [data-act="try-photo"]'), "Try it with your own photo");
     assert.ok(await page.isVisible('#intro-root [data-act="try-sample"]'), "Try a sample item");
     assert.ok(await page.isVisible('#intro-root [data-act="skip-video"]'), "Skip on the video");
-    assert.ok(await page.isVisible("#intro-ph"), "placeholder is shown until a video is dropped in");
     await shot("welcome", { also: "v4-welcome.png" });
 
     // Photo path is offered; then we take the sample path through the whole demo.
@@ -232,7 +240,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Jessika's Flip Side v0\.4\.0/);
+    assert.match(await text(), /Jessika's Flip Side v0\.4\.1/);
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);

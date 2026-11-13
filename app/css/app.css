@@ -297,6 +297,7 @@ body.intro-open .toast{bottom:calc(var(--sab) + 16px)}
 .intro-wordmark .wordmark-bold{font-size:1.15rem;margin:0;color:var(--ink)}
 .intro-player{position:relative;width:100%;flex:1 1 auto;min-height:38vh;max-height:54vh;border-radius:22px;overflow:hidden;background:#0d3d39;box-shadow:var(--shadow);margin-bottom:14px}
 .intro-player video,.intro-player .intro-ph,.intro-player .intro-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.intro-player video[hidden],.intro-player .intro-ph[hidden]{display:none}
 .intro-ph-label{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);margin:0;background:rgba(13,61,57,.78);color:#fff;font-weight:750;font-size:1.02rem;padding:10px 16px;border-radius:999px;white-space:nowrap;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .intro-sound,.intro-skip{position:absolute;z-index:2;appearance:none;border:0;cursor:pointer;font-weight:700;color:#fff;background:rgba(13,61,57,.62);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);min-height:44px;padding:8px 14px;border-radius:999px}
 .intro-sound{left:12px;bottom:12px}
