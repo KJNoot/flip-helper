@@ -74,7 +74,26 @@ try {
   await page.waitForSelector("html[data-ready='1']");
   await page.evaluate(() => { window.__flipQuiet = true; });
 
+  await step("walkthrough is skippable and Ask a question is always visible", async () => {
+    assert.ok(await page.isVisible("#walkthrough"), "first-run walkthrough opens");
+    assert.match(await page.textContent("#walkthrough"), /Welcome to Flip Helper/);
+    assert.match(await page.textContent("#walkthrough"), /1 of 4/);
+    await shot("walkthrough", { also: "v3-walkthrough.png" });
+    assert.ok(await page.isVisible('#walkthrough [data-r="skip"]'));
+    await page.click('#walkthrough [data-r="skip"]');
+    await page.waitForSelector("#walkthrough", { state: "detached" });
+    assert.ok(await page.isVisible("#ask-fab"), "Ask a question is on every screen");
+    await page.click("#ask-fab");
+    await page.waitForSelector("#ask-sheet");
+    assert.match(await page.textContent("#ask-sheet"), /Settings/);
+    assert.match(await page.textContent("#ask-sheet"), /AI key|paste the AI key|To ask a question/i);
+    await shot("ask-nokey", { also: "v3-ask.png" });
+    await page.click('#ask-sheet [data-r="0"]');
+    await page.waitForSelector("#ask-sheet", { state: "detached" });
+  });
+
   await step("home: empty, suggestion, honesty, totals at zero", async () => {
+    await go("#/home");
     assert.equal(await page.title(), "Flip Helper");
     assert.ok(await page.isVisible("#suggest-open"), "Send a suggestion is on every screen");
     assert.match(await text(), /Take a photo/);
@@ -109,7 +128,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Flip Helper v0\.2\.0/);
+    assert.match(await text(), /Flip Helper v0\.3\.0/);
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);
@@ -125,8 +144,15 @@ try {
     assert.match(await text(), /Coming later/);
     assert.match(await text(), /Take-down reminders/);
     assert.ok(await page.isVisible("#dropdays"));
+    assert.ok(await page.isVisible("#pause-all"), "Pause all automation");
+    assert.match(await text(), /no subscription/i);
+    assert.match(await text(), /See what each site allows/);
+    assert.match(await text(), /Import items from a spreadsheet|CSV/);
+    assert.ok(await page.isVisible("#ask-fab"));
     await page.locator("#sitescard").scrollIntoViewIfNeeded();
     await shot("settings-sites", { also: "04-settings.png" });
+    await page.locator("#pausecard").scrollIntoViewIfNeeded();
+    await shot("settings-pause", { also: "v3-settings.png" });
   });
 
   await step("add: write a listing myself, save, then copy and mark listed", async () => {
@@ -213,15 +239,20 @@ try {
     assert.match(stats[2], /\$14\.40/);
     assert.ok(await page.isVisible("#delist-alerts"));
     assert.match(await text(), /don't let them sell twice|Take these down/);
+    assert.match(await text(), /Take them all down automatically/);
     const badge = await page.textContent("#items-badge");
     assert.ok(badge && Number(badge) >= 1, "Items tab shows a take-down badge");
     await shot("home", { also: "01-home.png" });
+    await page.locator("#delist-alerts").scrollIntoViewIfNeeded();
+    await shot("home-takedown", { also: "v3-home.png" });
   });
 
   await step("item: delist checklist, checking off clears the highlight", async () => {
     await go("#/item/it_mug_demo");
     assert.match(await text(), /Take it down/);
     assert.match(await text(), /not automatic/);
+    assert.ok(await page.isVisible("#takedown-all"));
+    assert.match(await text(), /Take them all down automatically/);
     assert.ok(await page.isVisible('#delist [data-site="poshmark"]'));
     assert.ok(await page.isVisible('#delist [data-site="mercari"]'));
     assert.equal(await page.locator('#delist [data-site="ebay"]').count(), 0, "the sale site is not a delist target");
@@ -243,6 +274,10 @@ try {
     assert.match(await text(), /USPS Ground Advantage/);
     assert.match(await text(), /Coming later/);
     await shot("shipping", { also: "v2-shipping.png" });
+    if (await page.locator("#sold-pack, #qr, #sale").count()) {
+      await page.locator("#sold-pack, #sale").first().scrollIntoViewIfNeeded();
+      await shot("item-pack", { also: "v3-item.png" });
+    }
     await page.check('#delist [data-act="delist"][data-site="poshmark"]');
     await page.waitForTimeout(250);
     await page.check('#delist [data-act="delist"][data-site="mercari"]');

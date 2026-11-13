@@ -1,8 +1,8 @@
 # Flip Helper — roadmap to the full version
 
-This is the plan for later, after the tester has used the iPhone helper. Parts of v0.2 (the take-down checklist with reminders, sold-price links, fee tables, Buy or pass) are already in the phone app. Automatic take-down and official sold prices are not built yet, and nothing is promised for a date. The goal is the same one Ken described: she takes a photo, approves a draft, and the item is listed on her sites; when it sells on one, it comes down on the others. That has to be done in a way that is legal, official where official doors exist, and honest where they do not.
+This is the plan for later, after the tester has used the iPhone helper. Parts of v0.2 and v0.3 (the take-down checklist with reminders and a guided walk-through, sold-price links, fee tables, Buy or pass, Ask a question, and the rest of the complete phone app) are already in the phone app. Automatic take-down and official sold prices are not built yet, and nothing is promised for a date. The goal is the same one Ken described: she takes a photo, approves a draft, and the item is listed on her sites; when it sells on one, it comes down on the others. That has to be done in a way that is legal, official where official doors exist, and honest where they do not.
 
-v0.2 (this release) is the iPhone helper: photo, AI draft, Buy or pass, her approval, a tracker, a sold take-down checklist with a countdown and reminders, price-drop ideas, basic photo clean-up, shipping estimates, and a tax year view. Posting and taking listings down are things she does herself. That is on purpose. Automatic take-down is designed below and is not built yet.
+v0.3 (this release) is the complete iPhone helper: photo, AI draft, Buy or pass, her approval, a tracker, a sold take-down checklist with a countdown, reminders, and a guided “Take them all down automatically” walk-through (today it flags Unavailable and opens each site; official automatic removal is still later), price-drop ideas that respect a profit floor, full profit and taxes, bins and QR labels, CSV import, an Ask-a-question helper, and a short first-run walkthrough. Nothing essential is locked behind an upgrade. Posting and taking listings down are still things she does herself, with a guided next-site flow. That is on purpose. Official automatic take-down is designed below and is not built yet.
 
 ## The gold standard, said plainly
 
@@ -55,7 +55,7 @@ A simple, honest design:
 - For a helper site, the companion shows a card: "Take down [item] on [site]?" with a preview. She taps Approve. Only then does it perform the take-down in her already-open, already-signed-in tab. If she says no, the phone checklist stays.
 - If anything fails (the site changed, she was signed out, the network dropped), the companion marks that site as failed, and the phone shows a loud warning: "Still listed on [site]. Please take it down yourself." Reminders continue. We never pretend a take-down worked if we did not get a clear success.
 
-Timing: the goal is minutes after a sale is marked, not hours. Official APIs can be immediate. The helper depends on the computer being awake, which she is willing to leave on. v0.2 already counts down the first 15 minutes and reminds her on the phone so she is not waiting on the computer to exist.
+Timing: the goal is minutes after a sale is marked, not hours. Official APIs can be immediate. The helper depends on the computer being awake, which she is willing to leave on. The phone app already counts down the first 15 minutes and reminds her on the phone so she is not waiting on the computer to exist.
 
 ### Rules for the companion, if we build it
 
@@ -67,15 +67,15 @@ Timing: the goal is minutes after a sale is marked, not hours. Official APIs can
 - We stay legal, not sneaky. If a competitor uses an extension in a gray area, that is not our model.
 - Failed take-downs are always visible and never silently skipped. Double-sale protection is only as good as the honest failure warning.
 
-### What v0.2 already does, and what is still later
+### What v0.3 already does, and what is still later
 
-Already in the phone app: a loud take-down checklist, a 15-minute countdown, an in-app badge, and optional notifications while the app is open, until every other site is checked off.
+Already in the phone app: a loud take-down checklist, a 15-minute countdown, an in-app badge, optional notifications while the app is open, a “Take them all down automatically” guided walk-through (flags Unavailable, opens each remaining site, ticks off when she confirms), and Pause all automation. This cannot promise a double sale is impossible.
 
-Still later: official API take-down, the computer helper, and notifications that still fire when the phone app is closed. Those are Coming later, and they stay labeled that way until they work.
+Still later: official API take-down (eBay, Etsy, Shopify first), the computer helper, automatic live/gone checks, and notifications that still fire when the phone app is closed. Those are Coming later, and they stay labeled that way until they work. Some sites will always need her tap.
 
 ## Order of work
 
-1. **v0.2, in testers' hands (this release).** iPhone web app. Photo, AI draft, Buy or pass, price and site advice (clearly labeled estimates), her approval, inventory, a sold take-down checklist with reminders, price-drop ideas, basic photo clean-up, shipping estimates, a tax year view, and a suggestion box. She picks which sites she sells on. We learn from her suggestions which sites she actually uses and what is missing.
+1. **v0.3, in testers' hands (this release).** iPhone web app. The complete helper described above, including guided take-down, Ask a question, and a simple first-run walkthrough. She picks which sites she sells on. We learn from her suggestions which sites she actually uses and what is missing.
 2. **Official eBay connection.** Ken's eBay developer account, her "Sign in with eBay" permission, then real list and take-down for eBay, labeled Working, and official sold prices through eBay's Marketplace Insights / Browse APIs (the adapter is already sketched in the app). Other sites stay "Needs you to post."
 3. **Official Etsy**, if Etsy grants Commercial Access (or a personal shop connection if that is all she needs). Same honest labeling.
 4. **Official Shopify**, only if she has a Shopify shop.

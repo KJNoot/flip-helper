@@ -1,6 +1,6 @@
 // Year-end totals: income, cost of goods, fees, shipping, and mileage.
 // This is a record-keeper, not tax advice.
-import { money, formatUsd } from "./inventory.js";
+import { money, formatUsd, profit as itemProfit } from "./inventory.js";
 import { siteName } from "./sites.js";
 import { ymd } from "./settings.js";
 
@@ -28,12 +28,28 @@ export function tripInYear(trip, year) {
 export function yearTotals(items, trips, year, at = Date.now()) {
   const y = Number(year) || new Date(at).getFullYear();
   const sold = (items || []).filter(i => itemSoldInYear(i, y));
-  let income = 0, cogs = 0, fees = 0, shipping = 0;
+  let income = 0, cogs = 0, fees = 0, shipping = 0, supplies = 0, discounts = 0, refunds = 0, received = 0, receivedCount = 0;
   for (const item of sold) {
     income = money(income + (money(item.salePrice) ?? 0));
     cogs = money(cogs + (money(item.costPaid) ?? 0));
-    fees = money(fees + (money(item.fees) ?? 0));
-    shipping = money(shipping + (money(item.shippingPaid) ?? 0));
+    const hasM = item.marketplaceFees != null && item.marketplaceFees !== "";
+    const hasP = item.paymentFees != null && item.paymentFees !== "";
+    const feeAmt = (hasM || hasP)
+      ? (money(item.marketplaceFees) ?? 0) + (money(item.paymentFees) ?? 0)
+      : (money(item.fees) ?? 0);
+    fees = money(fees + feeAmt);
+    const ship = (item.actualShipCost != null && item.actualShipCost !== "")
+      ? (money(item.actualShipCost) ?? 0)
+      : (money(item.shippingPaid) ?? 0);
+    shipping = money(shipping + ship);
+    supplies = money(supplies + (money(item.supplies) ?? 0));
+    discounts = money(discounts + (money(item.discounts) ?? 0));
+    const ref = money(item.refunds) ?? (item.returns ? money(item.returns.refundAmount) ?? 0 : 0);
+    refunds = money(refunds + ref);
+    if (item.moneyReceived != null) {
+      received = money(received + (money(item.moneyReceived) ?? 0));
+      receivedCount += 1;
+    }
   }
   const yearTrips = (trips || []).filter(t => tripInYear(t, y) && t.miles != null);
   let miles = 0, mileageDeduction = 0;
@@ -42,7 +58,7 @@ export function yearTotals(items, trips, year, at = Date.now()) {
     const d = t.deduction != null ? t.deduction : (t.miles != null && t.rate != null ? money(t.miles * t.rate) : 0);
     mileageDeduction = money(mileageDeduction + (d || 0));
   }
-  const goodsProfit = money(income - cogs - fees - shipping);
+  const goodsProfit = money(income - cogs - fees - shipping - supplies - discounts - refunds);
   return {
     year: y,
     soldCount: sold.length,
@@ -51,6 +67,11 @@ export function yearTotals(items, trips, year, at = Date.now()) {
     cogs,
     fees,
     shipping,
+    supplies,
+    discounts,
+    refunds,
+    received,
+    receivedCount,
     miles,
     mileageDeduction,
     goodsProfit,
@@ -93,22 +114,36 @@ export function yearCsv(totals) {
   lines.push("Cost of goods," + money(totals.cogs));
   lines.push("Fees," + money(totals.fees));
   lines.push("Shipping you paid," + money(totals.shipping));
-  lines.push("Income minus cost, fees, and shipping," + money(totals.goodsProfit));
+  lines.push("Supplies," + money(totals.supplies ?? 0));
+  lines.push("Discounts," + money(totals.discounts ?? 0));
+  lines.push("Returns and refunds," + money(totals.refunds ?? 0));
+  lines.push("Income minus cost, fees, shipping, supplies, discounts, and refunds," + money(totals.goodsProfit));
+  lines.push("Money received (where entered)," + money(totals.received ?? 0));
   lines.push("Mileage (miles)," + money(totals.miles));
   lines.push("Mileage at the rate you logged," + money(totals.mileageDeduction));
   lines.push("");
   lines.push("Sold items");
-  lines.push(["Date", "Title", "Sold on", "Sale price", "Cost of goods", "Fees", "Shipping", "Profit"].join(","));
+  lines.push(["Date", "Title", "Sold on", "Sale price", "Cost of goods", "Fees", "Shipping", "Supplies", "Discounts", "Refunds", "Money received", "Profit"].join(","));
   for (const item of totals.sold || []) {
-    const profit = money((money(item.salePrice) ?? 0) - (money(item.costPaid) ?? 0) - (money(item.fees) ?? 0) - (money(item.shippingPaid) ?? 0));
+    const profit = itemProfit(item);
+    const hasM = item.marketplaceFees != null && item.marketplaceFees !== "";
+    const hasP = item.paymentFees != null && item.paymentFees !== "";
+    const feeAmt = (hasM || hasP)
+      ? money((money(item.marketplaceFees) ?? 0) + (money(item.paymentFees) ?? 0))
+      : money(item.fees);
+    const ship = (item.actualShipCost != null && item.actualShipCost !== "") ? money(item.actualShipCost) : money(item.shippingPaid);
     lines.push([
       soldDate(item),
       csvEscape(item.title || "Untitled item"),
       csvEscape(item.soldOn ? siteName(item.soldOn) : ""),
       money(item.salePrice) ?? "",
       money(item.costPaid) ?? "",
-      money(item.fees) ?? "",
-      money(item.shippingPaid) ?? "",
+      feeAmt ?? "",
+      ship ?? "",
+      money(item.supplies) ?? "",
+      money(item.discounts) ?? "",
+      (money(item.refunds) ?? (item.returns ? money(item.returns.refundAmount) : null)) ?? "",
+      money(item.moneyReceived) ?? "",
       profit ?? ""
     ].join(","));
   }
@@ -140,7 +175,10 @@ export function yearSummaryText(totals) {
     `Cost of goods: ${formatUsd(t.cogs)}`,
     `Fees: ${formatUsd(t.fees)}`,
     `Shipping you paid: ${formatUsd(t.shipping)}`,
-    `Income minus cost, fees, and shipping: ${formatUsd(t.goodsProfit)}`,
+    `Supplies: ${formatUsd(t.supplies ?? 0)}`,
+    `Discounts: ${formatUsd(t.discounts ?? 0)}`,
+    `Returns and refunds: ${formatUsd(t.refunds ?? 0)}`,
+    `Income minus cost, fees, shipping, supplies, discounts, and refunds: ${formatUsd(t.goodsProfit)}`,
     `Mileage: ${t.miles} miles`,
     `Mileage at the rate you logged: ${formatUsd(t.mileageDeduction)}`,
     ""

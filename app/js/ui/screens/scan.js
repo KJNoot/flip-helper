@@ -7,9 +7,16 @@ import { normalizeScanDraft, scanResult, itemFromScan, VERDICT_LABELS } from "..
 import { heuristicShip, boxSizeLabel, SHIP_TABLE_NOTE } from "../../core/shipping.js";
 import { FEE_TABLE_NOTE } from "../../core/fees.js";
 import { formatUsd as usd, money } from "../../core/inventory.js";
+import { alreadyOwnedMatches, alreadyOwnedWarning } from "../../core/match.js";
+import { getSettings } from "../../core/settings.js";
+import { buyUpToLabel } from "../../core/profit.js";
+import { tip, openTip } from "../tips.js";
 
 function emptyWork() {
-  return { photos: [], asking: "", notes: "", busy: false, error: "", draft: null, result: null };
+  return {
+    photos: [], asking: "", notes: "", busy: false, error: "", draft: null, result: null,
+    assumptions: { resale: "", fees: "", shipping: "", desiredProfit: "" }
+  };
 }
 
 export function renderScan(ctx, el) {
@@ -22,11 +29,12 @@ function paint(ctx, el) {
   const photos = w.photos || [];
   const result = w.result;
   const draft = w.draft;
+  const matches = draft && draft.title ? alreadyOwnedMatches(ctx.items, draft.title) : [];
   el.innerHTML = `
     <div class="topbar"><a class="iconbtn" href="#/home" aria-label="Back">‹</a><h2>Buy or pass</h2><span class="spacer48"></span></div>
     <div class="card">
       <div class="row between"><h3>Quick check</h3>${honesty("ok", "Working")}</div>
-      <p class="small muted">Take a photo at a thrift store or garage sale. The app identifies the item, estimates what it might resell for, subtracts approximate fees and shipping, and gives a Buy, Maybe, or Pass guide. Prices and fees are estimates.</p>
+      <p class="small muted">Take a photo at a thrift store or garage sale. The app identifies the item, estimates what it might resell for, subtracts approximate fees and shipping, and gives a Buy, Maybe, or Pass guide — and a “Buy up to” amount. Prices and fees are estimates.</p>
       <div class="photos" id="photos">
         ${photos.map((p, i) => `<div class="photo">
           <img src="${esc(p.dataUrl)}" alt="Photo ${i + 1}">
@@ -48,10 +56,13 @@ function paint(ctx, el) {
       <label class="field"><span>Anything to know (optional)</span>
         <textarea id="notes" rows="2" placeholder="Brand, size, flaws">${esc(w.notes || "")}</textarea>
       </label>
-      <button type="button" class="btn" data-act="check" ${w.busy ? "disabled" : ""}>${w.busy ? "Looking at your photo…" : "✨ Identify and check"}</button>
+      <button type="button" class="btn btn-main" data-act="check" ${w.busy ? "disabled" : ""}>${w.busy ? "Looking at your photo…" : "✨ Identify and check"}</button>
       ${!hasKey() ? `<p class="tiny muted" style="margin-top:10px">To identify from a photo, paste the AI key in <a href="#/settings">Settings</a> first. You can still enter a price and see fee math after a draft is saved.</p>` : ""}
       ${w.error ? `<p class="attn" id="scan-error">${esc(w.error)}</p>` : ""}
     </div>
+    ${matches.length ? `<div class="card alert" id="already-own"><p class="small">${esc(alreadyOwnedWarning(matches))}</p>
+      <ul class="itemlist">${matches.map(m => `<li><a class="li" href="#/item/${esc(m.id)}"><span class="grow"><b>${esc(m.title)}</b></span></a></li>`).join("")}</ul>
+    </div>` : ""}
     ${draft || result ? resultsBlock(w) : ""}
   `;
 
@@ -78,8 +89,20 @@ function paint(ctx, el) {
   });
   const notes = $("#notes", el);
   if (notes) notes.addEventListener("input", () => { ctx.scanWork.notes = notes.value; });
+  ["assume-resale", "assume-fees", "assume-ship", "assume-profit"].forEach(id => {
+    const n = $("#" + id, el);
+    if (n) n.addEventListener("input", () => {
+      const a = ctx.scanWork.assumptions || (ctx.scanWork.assumptions = {});
+      if (id === "assume-resale") a.resale = n.value;
+      if (id === "assume-fees") a.fees = n.value;
+      if (id === "assume-ship") a.shipping = n.value;
+      if (id === "assume-profit") a.desiredProfit = n.value;
+      if (ctx.scanWork.draft) recompute(ctx, el, false);
+    });
+  });
 
   bind(el, {
+    tip: b => openTip(b.dataset.tip || ""),
     delphoto: b => {
       ctx.scanWork.photos = (ctx.scanWork.photos || []).filter((_, n) => n !== +b.dataset.i);
       paint(ctx, el);
@@ -97,6 +120,7 @@ function paint(ctx, el) {
           enabledSites: getEnabledIds()
         });
         ctx.scanWork.draft = normalizeScanDraft(json);
+        ctx.scanWork.assumptions = { resale: "", fees: "", shipping: "", desiredProfit: "" };
         recompute(ctx, el, true);
         toast("Check ready. Please look it over.");
       } catch (e) {
@@ -132,19 +156,60 @@ function sync(ctx, el) {
   const notes = $("#notes", el);
   if (asking) ctx.scanWork.asking = asking.value;
   if (notes) ctx.scanWork.notes = notes.value;
+  const a = ctx.scanWork.assumptions || (ctx.scanWork.assumptions = {});
+  const r = $("#assume-resale", el); if (r) a.resale = r.value;
+  const f = $("#assume-fees", el); if (f) a.fees = f.value;
+  const s = $("#assume-ship", el); if (s) a.shipping = s.value;
+  const p = $("#assume-profit", el); if (p) a.desiredProfit = p.value;
+}
+
+function assumptionValues(w) {
+  const a = w.assumptions || {};
+  const settings = getSettings();
+  const d = w.draft;
+  const mid = d ? ((money(d.priceLow) != null && money(d.priceHigh) != null)
+    ? money(((money(d.priceLow) + money(d.priceHigh)) / 2))
+    : (money(d.priceHigh) ?? money(d.priceLow))) : null;
+  return {
+    resale: money(a.resale) != null ? money(a.resale) : mid,
+    fees: money(a.fees),
+    shipping: money(a.shipping),
+    desiredProfit: money(a.desiredProfit) != null ? money(a.desiredProfit) : settings.desiredProfit
+  };
 }
 
 function recompute(ctx, el, fullPaint) {
   const d = ctx.scanWork.draft;
   const ask = money(ctx.scanWork.asking);
   const ship = d && d.ship ? d.ship : heuristicShip(d || {});
+  const ass = assumptionValues(ctx.scanWork);
   ctx.scanWork.result = d ? scanResult({
     asking: ask,
     resaleLow: d.priceLow,
-    resaleHigh: d.priceHigh,
+    resaleHigh: money(ctx.scanWork.assumptions && ctx.scanWork.assumptions.resale) != null
+      ? money(ctx.scanWork.assumptions.resale) : d.priceHigh,
     siteIds: getEnabledIds(),
-    weightOz: ship.weightOz
+    weightOz: ship.weightOz,
+    shippingOverride: ass.shipping,
+    desiredProfit: ass.desiredProfit,
+    feeOverride: ass.fees
   }) : null;
+  // If she edited resale, also pass it as both low and high so mid equals it —
+  // already handled if only high is set... midPrice of (low, edited high) isn't equal.
+  // Recompute buy-up-to with explicit resale if provided.
+  if (ctx.scanWork.result && ass.resale != null) {
+    const r = scanResult({
+      asking: ask,
+      resaleLow: ass.resale,
+      resaleHigh: ass.resale,
+      siteIds: getEnabledIds(),
+      weightOz: ship.weightOz,
+      shippingOverride: ass.shipping,
+      desiredProfit: ass.desiredProfit,
+      feeOverride: ass.fees
+    });
+    ctx.scanWork.result = { ...ctx.scanWork.result, buyUpTo: r.buyUpTo, buyUpToLabel: r.buyUpToLabel, assumptions: r.assumptions, resaleMid: r.resaleMid };
+  }
   ctx.scanWork.busy = false;
   if (fullPaint !== false) paint(ctx, el);
   else if (ctx.scanWork.result) {
@@ -161,6 +226,8 @@ function resultsBlock(w) {
   const d = w.draft || {};
   const r = w.result;
   const ship = d.ship || heuristicShip(d);
+  const ass = assumptionValues(w);
+  const settings = getSettings();
   return `
     <div class="card" id="scan-results">
       <div class="row between"><h3>What it looks like</h3>${honesty("warn", "Estimate")}</div>
@@ -175,6 +242,20 @@ function resultsBlock(w) {
         <p class="tiny muted">This is an AI estimate from the photo, not from checking sold listings.</p>
       </div>
     </div>
+    ${r && r.buyUpToLabel ? `<div class="card" id="buy-up-to">
+      <div class="row between"><h3>Buy up to</h3>${honesty("warn", "Estimate")} ${tip("Estimated resale, minus approximate fees, shipping, and the profit you want to keep. You can change those numbers below.")}</div>
+      <p class="big-num">${esc(r.buyUpToLabel)}</p>
+      <p class="small muted">So you still have a chance to keep about ${esc(usd(ass.desiredProfit ?? settings.desiredProfit))} after fees and shipping, if it sells near ${esc(usd((r.assumptions && r.assumptions.resale) || r.resaleMid))}.</p>
+      <details class="more-block"><summary>Change the numbers used</summary>
+        <div class="grid2">
+          <label class="field"><span>Estimated resale</span><input id="assume-resale" inputmode="decimal" value="${esc((w.assumptions && w.assumptions.resale) || "")}" placeholder="${esc(usd(r.resaleMid))}"></label>
+          <label class="field"><span>Fees</span><input id="assume-fees" inputmode="decimal" value="${esc((w.assumptions && w.assumptions.fees) || "")}" placeholder="${esc(usd(r.assumptions && r.assumptions.fees))}"></label>
+          <label class="field"><span>Shipping</span><input id="assume-ship" inputmode="decimal" value="${esc((w.assumptions && w.assumptions.shipping) || "")}" placeholder="${esc(usd(r.assumptions && r.assumptions.shipping))}"></label>
+          <label class="field"><span>Profit you want</span><input id="assume-profit" inputmode="decimal" value="${esc((w.assumptions && w.assumptions.desiredProfit) || "")}" placeholder="${esc(usd(settings.desiredProfit))}"></label>
+        </div>
+        <p class="tiny muted">These only change the “Buy up to” guide. They are not saved to the item until you tap Save.</p>
+      </details>
+    </div>` : ""}
     <div id="verdict-live">${r ? verdictHtml(w) : `<div class="card"><p class="muted">Enter what they're asking to see a Buy, Maybe, or Pass guide.</p></div>`}</div>
     <div class="card">
       <div class="row between"><h3>Shipping used in the math</h3>${honesty("warn", "Estimate")}</div>
@@ -182,7 +263,7 @@ function resultsBlock(w) {
       <p class="tiny muted">${esc(ship.reason || "")} ${esc(SHIP_TABLE_NOTE)}</p>
     </div>
     <div class="stack" style="margin-top:14px">
-      <button type="button" class="btn" data-act="save">Save to my items</button>
+      <button type="button" class="btn btn-main" data-act="save">Save to my items</button>
       <button type="button" class="btn soft" data-act="reset">Check another item</button>
     </div>
   `;
@@ -196,6 +277,7 @@ function verdictHtml(w) {
     ? `<div class="verdict ${verdictClass(v)}" id="verdict">
         <div class="row between"><h3>${esc(VERDICT_LABELS[v])}</h3>${honesty("warn", "Estimate")}</div>
         <p class="small">${verdictSentence(r)}</p>
+        ${r.buyUpToLabel ? `<p class="small"><b>${esc(r.buyUpToLabel)}</b></p>` : ""}
       </div>`
     : `<div class="card"><p class="muted">Enter what they're asking to see a guide.</p></div>`;
   const rows = (r.rows || []).map(row => `<tr>
@@ -233,3 +315,4 @@ function siteNameSafe(r) {
   return row ? row.name : "";
 }
 
+export { buyUpToLabel };

@@ -30,7 +30,11 @@ export function renderTaxes(ctx, el, year) {
         <div><span class="tiny muted">Cost of goods</span><b>${esc(formatUsd(totals.cogs))}</b></div>
         <div><span class="tiny muted">Fees</span><b>${esc(formatUsd(totals.fees))}</b></div>
         <div><span class="tiny muted">Shipping you paid</span><b>${esc(formatUsd(totals.shipping))}</b></div>
-        <div><span class="tiny muted">After cost, fees, shipping</span><b>${esc(formatUsd(totals.goodsProfit))}</b></div>
+        <div><span class="tiny muted">Supplies</span><b>${esc(formatUsd(totals.supplies))}</b></div>
+        <div><span class="tiny muted">Discounts</span><b>${esc(formatUsd(totals.discounts))}</b></div>
+        <div><span class="tiny muted">Refunds</span><b>${esc(formatUsd(totals.refunds))}</b></div>
+        <div><span class="tiny muted">After cost, fees, shipping, supplies, discounts, and refunds</span><b>${esc(formatUsd(totals.goodsProfit))}</b></div>
+        <div><span class="tiny muted">Money received</span><b>${esc(totals.receivedCount ? formatUsd(totals.received) : "—")}</b></div>
         <div><span class="tiny muted">Mileage</span><b>${esc(String(totals.miles))} mi</b></div>
       </div>
       <p class="small">Mileage at the rates you logged: <b>${esc(formatUsd(totals.mileageDeduction))}</b> (${totals.tripCount} trip${totals.tripCount === 1 ? "" : "s"}).</p>
@@ -123,7 +127,12 @@ function tripRow(t) {
 }
 
 function itemRow(item) {
-  const profit = (money(item.salePrice) ?? 0) - (money(item.costPaid) ?? 0) - (money(item.fees) ?? 0) - (money(item.shippingPaid) ?? 0);
+  // Use the same rules as the year totals (new cost fields default to 0).
+  const hasM = item.marketplaceFees != null && item.marketplaceFees !== "";
+  const hasP = item.paymentFees != null && item.paymentFees !== "";
+  const feeAmt = (hasM || hasP) ? (money(item.marketplaceFees) ?? 0) + (money(item.paymentFees) ?? 0) : (money(item.fees) ?? 0);
+  const ship = (item.actualShipCost != null && item.actualShipCost !== "") ? (money(item.actualShipCost) ?? 0) : (money(item.shippingPaid) ?? 0);
+  const profit = (money(item.salePrice) ?? 0) - (money(item.costPaid) ?? 0) - feeAmt - ship - (money(item.supplies) ?? 0) - (money(item.discounts) ?? 0) - (money(item.refunds) ?? (item.returns ? money(item.returns.refundAmount) ?? 0 : 0));
   const d = item.soldAt ? ymd(item.soldAt) : "";
   return `<tr>
     <td>${esc(d)}</td>

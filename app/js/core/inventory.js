@@ -1,6 +1,10 @@
 // Pure inventory logic: stages, listing/delist checklist, profit, monthly totals.
 // No DOM, no storage, no network. Safe to unit-test in Node.
 import { SITES, SITE_IDS, isKnownSite, siteName, knownSiteIds } from "./sites.js";
+import { normalizeSiteStatusMap, flagUnavailableEverywhere, setSiteStatus, siteStatusOf } from "./sitestatus.js";
+import { normalizeHistory as normalizeEditHistory } from "./history.js";
+import { emptyConfirm, normalizeConfirm, normalizePhotoShows, normalizeAiGuess } from "./honesty.js";
+import { normalizeReturn, normalizeReceipts } from "./profit.js";
 
 export { SITES, SITE_IDS, isKnownSite, siteName, knownSiteIds };
 
@@ -66,6 +70,38 @@ export function emptyItem(partial = {}, at = Date.now()) {
     priceUpdates: {},
     shipSuggest: null,
     scan: null,
+    unavailable: false,
+    siteStatus: {},
+    originals: null,
+    editHistory: [],
+    photoShows: null,
+    youConfirm: emptyConfirm(),
+    aiGuess: null,
+    binLocation: "",
+    material: "",
+    size: "",
+    marketplaceFees: null,
+    paymentFees: null,
+    supplies: null,
+    discounts: null,
+    refunds: null,
+    returns: null,
+    moneyReceived: null,
+    profitFloor: null,
+    packedWeightOz: null,
+    packedLengthIn: null,
+    packedWidthIn: null,
+    packedHeightIn: null,
+    actualShipCost: null,
+    receipts: [],
+    mileageTripIds: [],
+    boxId: null,
+    measurements: "",
+    flawsNoted: false,
+    noFlaws: false,
+    noBrand: false,
+    noSize: false,
+    pricingChoice: null,
     ...partial
   }, at);
 }
@@ -108,6 +144,53 @@ export function normalizeItem(raw = {}, at = Date.now()) {
   item.priceUpdates = normalizePriceUpdates(item.priceUpdates);
   item.shipSuggest = item.shipSuggest && typeof item.shipSuggest === "object" ? item.shipSuggest : null;
   item.scan = item.scan && typeof item.scan === "object" ? item.scan : null;
+  item.unavailable = !!(item.unavailable || item.soldAt);
+  item.siteStatus = normalizeSiteStatusMap(item.siteStatus);
+  item.originals = item.originals && typeof item.originals === "object" ? item.originals : null;
+  item.editHistory = normalizeEditHistory(item.editHistory);
+  item.photoShows = normalizePhotoShows(item.photoShows);
+  item.youConfirm = normalizeConfirm(item.youConfirm);
+  item.aiGuess = normalizeAiGuess(item.aiGuess);
+  item.binLocation = String(item.binLocation || "");
+  item.material = String(item.material || "");
+  item.size = String(item.size || "");
+  item.marketplaceFees = money(item.marketplaceFees);
+  item.paymentFees = money(item.paymentFees);
+  item.supplies = money(item.supplies);
+  item.discounts = money(item.discounts);
+  item.refunds = money(item.refunds);
+  item.returns = normalizeReturn(item.returns);
+  item.moneyReceived = money(item.moneyReceived);
+  item.profitFloor = money(item.profitFloor);
+  const pw = Number(item.packedWeightOz);
+  item.packedWeightOz = Number.isFinite(pw) && pw > 0 ? pw : null;
+  const pl = Number(item.packedLengthIn), pwi = Number(item.packedWidthIn), ph = Number(item.packedHeightIn);
+  item.packedLengthIn = Number.isFinite(pl) && pl > 0 ? pl : null;
+  item.packedWidthIn = Number.isFinite(pwi) && pwi > 0 ? pwi : null;
+  item.packedHeightIn = Number.isFinite(ph) && ph > 0 ? ph : null;
+  item.actualShipCost = money(item.actualShipCost);
+  item.receipts = normalizeReceipts(item.receipts);
+  item.mileageTripIds = Array.isArray(item.mileageTripIds) ? item.mileageTripIds.map(String) : [];
+  item.boxId = item.boxId ? String(item.boxId) : null;
+  item.measurements = String(item.measurements || "");
+  item.flawsNoted = !!item.flawsNoted;
+  item.noFlaws = !!item.noFlaws;
+  item.noBrand = !!item.noBrand;
+  item.noSize = !!item.noSize;
+  item.pricingChoice = ["quick", "balanced", "hold"].includes(item.pricingChoice) ? item.pricingChoice : null;
+  // Photos keep originalDataUrl when a clean-up was applied.
+  item.photos = item.photos.map(p => {
+    if (!p || typeof p !== "object") return p;
+    return {
+      ...p,
+      id: p.id || "",
+      dataUrl: p.dataUrl,
+      originalDataUrl: p.originalDataUrl || null,
+      cleaned: p.cleaned || null,
+      cleanedAt: p.cleanedAt || null,
+      addedAt: p.addedAt || 0
+    };
+  });
   return deriveStage(item);
 }
 
@@ -117,7 +200,7 @@ function normalizeComps(raw) {
     if (!c || typeof c !== "object") return null;
     const price = money(c.price);
     if (price == null) return null;
-    return { id: String(c.id || ""), price, siteId: String(c.siteId || ""), note: String(c.note || ""), at: c.at || 0 };
+    return { id: String(c.id || ""), price, siteId: String(c.siteId || ""), note: String(c.note || ""), date: String(c.date || ""), condition: String(c.condition || ""), confidence: String(c.confidence || ""), at: c.at || 0 };
   }).filter(Boolean) : [];
   const ai = src.ai && typeof src.ai === "object" ? {
     low: money(src.ai.low),
@@ -230,9 +313,18 @@ export function profit(item) {
   const sale = money(item.salePrice);
   if (sale == null) return null;
   const cost = money(item.costPaid) ?? 0;
-  const fees = money(item.fees) ?? 0;
-  const ship = money(item.shippingPaid) ?? 0;
-  return money(sale - cost - fees - ship);
+  const hasM = item.marketplaceFees != null && item.marketplaceFees !== "";
+  const hasP = item.paymentFees != null && item.paymentFees !== "";
+  const hasSplit = hasM || hasP;
+  const mFees = hasSplit ? (money(item.marketplaceFees) ?? 0) : (money(item.fees) ?? 0);
+  const pFees = hasSplit ? (money(item.paymentFees) ?? 0) : 0;
+  const ship = (item.actualShipCost != null && item.actualShipCost !== "")
+    ? (money(item.actualShipCost) ?? 0)
+    : (money(item.shippingPaid) ?? 0);
+  const supplies = money(item.supplies) ?? 0;
+  const discounts = money(item.discounts) ?? 0;
+  const refunds = money(item.refunds) ?? (item.returns ? money(item.returns.refundAmount) ?? 0 : 0);
+  return money(sale - cost - mFees - pFees - ship - supplies - discounts - refunds);
 }
 
 export function monthKey(at = Date.now()) {
@@ -276,7 +368,14 @@ export function setListed(item, siteId, listed = true, at = Date.now()) {
     delete listedOn[siteId];
     delete delistedOn[siteId];
   }
-  return deriveStage({ ...item, listedOn, delistedOn, updatedAt: at });
+  let next = { ...item, listedOn, delistedOn, updatedAt: at };
+  next = setSiteStatus(next, siteId, listed ? "live" : "draft", {
+    at,
+    lastCheckAt: listed ? at : (siteStatusOf(item, siteId) && siteStatusOf(item, siteId).lastCheckAt),
+    unavailable: listed ? !!(item.unavailable || item.soldAt) : false,
+    note: listed ? "" : "Listing cleared."
+  });
+  return deriveStage(next);
 }
 
 /**
@@ -298,9 +397,10 @@ export function markSold(item, { siteId, salePrice, fees, shippingPaid, at = Dat
     fees: fees !== undefined ? money(fees) : item.fees,
     shippingPaid: shippingPaid !== undefined ? money(shippingPaid) : item.shippingPaid,
     soldAt: item.soldAt || at,
+    unavailable: true,
     updatedAt: at
   };
-  return deriveStage(next);
+  return deriveStage(flagUnavailableEverywhere(next, at));
 }
 
 export function markDelisted(item, siteId, done = true, at = Date.now()) {
@@ -308,7 +408,13 @@ export function markDelisted(item, siteId, done = true, at = Date.now()) {
   const delistedOn = { ...(item.delistedOn || {}) };
   if (done) delistedOn[siteId] = { at };
   else delete delistedOn[siteId];
-  return { ...item, delistedOn, updatedAt: at };
+  let next = { ...item, delistedOn, updatedAt: at };
+  if (done) {
+    next = setSiteStatus(next, siteId, "removed", { at, lastCheckAt: at, unavailable: true, note: "You marked this as taken down." });
+  } else if (item.soldAt && item.soldOn !== siteId) {
+    next = setSiteStatus(next, siteId, "needsManual", { at, unavailable: true, note: "Still needs to be taken down." });
+  }
+  return next;
 }
 
 export function setShipCheck(item, checkId, value, at = Date.now()) {

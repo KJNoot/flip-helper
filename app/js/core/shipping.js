@@ -186,3 +186,42 @@ export function siteLabelUrl(siteId) {
 }
 
 export { formatUsd, siteName, SITES };
+
+
+/** The cost to use: her actual entered cost, or the estimate. */
+export function effectiveShipCost(item, weightOz) {
+  if (item && item.actualShipCost != null && item.actualShipCost !== "") {
+    return { usd: money(item.actualShipCost), actual: true, approx: false };
+  }
+  const oz = (item && item.packedWeightOz) || weightOz || (item && item.shipSuggest && item.shipSuggest.weightOz) || 16;
+  const est = defaultShippingCost(oz);
+  return { usd: est, actual: false, approx: true, weightOz: oz };
+}
+
+export function packedDims(item, boxes = []) {
+  const box = item && item.boxId ? (boxes || []).find(b => b.id === item.boxId) : null;
+  return {
+    lengthIn: (item && item.packedLengthIn) || (box && box.lengthIn) || (item && item.shipSuggest && item.shipSuggest.lengthIn) || null,
+    widthIn: (item && item.packedWidthIn) || (box && box.widthIn) || (item && item.shipSuggest && item.shipSuggest.widthIn) || null,
+    heightIn: (item && item.packedHeightIn) || (box && box.heightIn) || (item && item.shipSuggest && item.shipSuggest.heightIn) || null,
+    weightOz: (item && item.packedWeightOz) || (item && item.shipSuggest && item.shipSuggest.weightOz) || null,
+    boxId: item && item.boxId || null,
+    boxLabel: box ? box.label : (item && item.shipSuggest && item.shipSuggest.boxLabel) || ""
+  };
+}
+
+export function applyBoxToItem(item, box, at = Date.now()) {
+  if (!box) return { ...item, boxId: null, updatedAt: at };
+  return {
+    ...item,
+    boxId: box.id,
+    packedLengthIn: box.lengthIn,
+    packedWidthIn: box.widthIn,
+    packedHeightIn: box.heightIn,
+    updatedAt: at
+  };
+}
+
+export function setActualShipCost(item, amount, at = Date.now()) {
+  return { ...item, actualShipCost: money(amount), updatedAt: at };
+}

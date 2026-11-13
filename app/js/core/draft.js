@@ -2,6 +2,7 @@
 // The key is read from localStorage at call time and never logged.
 import { SITE_IDS, isKnownSite } from "./sites.js";
 import { money, emptyItem, normalizeAdvice } from "./inventory.js";
+import { seedConfirmsFromDraft, normalizePhotoShows, normalizeAiGuess } from "./honesty.js";
 import { getKey } from "./key.js";
 
 export const AI_MODEL = "gpt-4o-mini";
@@ -24,8 +25,15 @@ Look at the photo(s) and any notes. Reply with a single JSON object only, no mar
 - bestPrice: { "sites": ["ebay", "..."], "reason": "one or two short sentences" }. Sites from the list above where she might get a better price. Prefer her enabled sites if they were given. Pick 1 to 3 sites.
 - fastestSale: { "sites": ["facebook", "..."], "reason": "one or two short sentences" }. Sites from the list above where it might sell sooner (local pickup, lower fees, a matching audience). Pick 1 to 3 sites.
 For both bestPrice and fastestSale: say clearly this is a rough estimate from the photo and general knowledge, not from checking live listings or actual sale times. Prefer a site that fits the item (Grailed for menswear, Kidizen for kids' clothes, Etsy for handmade or vintage, Whatnot for collectibles, Facebook or OfferUp or Craigslist for local bulky items, thredUP for a bag of everyday clothes). Do not invent sales data.
+Also include these honesty keys:
+- photoShows: { "whatYouSee": "only what is clearly visible", "visibleText": "any readable text, or empty", "visibleFlaws": "damage you can actually see, or empty if none is visible", "visibleDetails": "colors, shape, parts you can see" }
+- material: only if clearly visible, otherwise ""
+- size: only if clearly readable on a tag or label, otherwise ""
+- measurements: only if you can read them, otherwise ""
 If you cannot tell what the item is, say so in the title and description, give a wide price range or omit prices, and do not guess a brand.
-Never invent certificates, authenticity, measurements, or a price based on fake comps. Prices and site advice are estimates only.`;
+Do not invent a brand. If the brand is not clearly visible or readable, leave brand empty.
+Do not invent a condition. If you cannot reasonably tell, leave condition empty.
+Never invent certificates, authenticity, measurements, flaws, or a price based on fake comps. Prices and site advice are estimates only.`;
 
 export function downscaleDataUrl(dataUrl, max = MAX_PHOTO_EDGE, quality = JPEG_QUALITY) {
   return new Promise((resolve, reject) => {
@@ -97,12 +105,24 @@ export function normalizeDraft(raw = {}) {
   let condition = String(raw.condition || "").trim();
   const brand = String(raw.brand || "").trim();
   if (/^unknown$/i.test(brand)) { /* treat as empty below */ }
+  const photoShows = raw.photoShows || raw.photo_shows || null;
+  const material = /^unknown$/i.test(String(raw.material || "").trim()) ? "" : String(raw.material || "").trim();
+  const size = /^unknown$/i.test(String(raw.size || "").trim()) ? "" : String(raw.size || "").trim();
   return {
     title: String(raw.title || "").trim(),
     description: String(raw.description || "").trim(),
     category: String(raw.category || "").trim(),
-    condition,
+    condition: /^unknown$/i.test(condition) ? "" : condition,
     brand: /^unknown$/i.test(brand) ? "" : brand,
+    material,
+    size,
+    measurements: String(raw.measurements || raw.measure || "").trim(),
+    photoShows: photoShows && typeof photoShows === "object" ? {
+      what: String(photoShows.whatYouSee || photoShows.what || "").trim(),
+      visibleText: String(photoShows.visibleText || photoShows.text || "").trim(),
+      visibleFlaws: String(photoShows.visibleFlaws || photoShows.flaws || "").trim(),
+      visibleDetails: String(photoShows.visibleDetails || photoShows.details || "").trim()
+    } : null,
     priceLow: money(raw.priceLow ?? raw.price_low),
     priceHigh: money(raw.priceHigh ?? raw.price_high),
     priceReason: String(raw.priceReason || raw.price_reason || "").trim(),
@@ -117,13 +137,36 @@ export function normalizeDraft(raw = {}) {
 export function applyDraft(item, draft, at = Date.now()) {
   const d = normalizeDraft(draft);
   const asking = item.askingPrice ?? d.priceHigh ?? d.priceLow;
-  return emptyItem({
+  const aiGuess = normalizeAiGuess({
+    brand: d.brand,
+    condition: d.condition,
+    material: d.material,
+    size: d.size,
+    category: d.category,
+    priceLow: d.priceLow,
+    priceHigh: d.priceHigh,
+    note: d.priceReason
+  });
+  // Title, description, category, and prices fill in for her to review.
+  // Brand, condition, material, and size are treated as AI guesses until she confirms them.
+  let next = emptyItem({
     ...item,
-    ...d,
+    title: d.title || item.title,
+    description: d.description || item.description,
+    category: d.category || item.category,
+    priceLow: d.priceLow,
+    priceHigh: d.priceHigh,
+    priceReason: d.priceReason,
+    siteTweaks: d.siteTweaks,
     askingPrice: asking,
     siteAdvice: d.siteAdvice,
+    photoShows: normalizePhotoShows(d.photoShows) || item.photoShows,
+    aiGuess,
+    measurements: d.measurements || item.measurements,
     updatedAt: at
   }, at);
+  next = seedConfirmsFromDraft(next, { aiGuess, photoShows: next.photoShows }, at);
+  return next;
 }
 
 export function friendlyApiError(status, bodyText) {

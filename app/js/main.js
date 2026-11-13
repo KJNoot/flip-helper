@@ -10,10 +10,14 @@ import { renderItems } from "./ui/screens/items.js";
 import { renderSettings } from "./ui/screens/settings.js";
 import { renderScan } from "./ui/screens/scan.js";
 import { renderTaxes } from "./ui/screens/taxes.js";
+import { renderCompat } from "./ui/screens/compat.js";
 import { badgeCount, attentionItems, shouldRemind, reminderBody, delistCountdown } from "./core/protect.js";
 import { getSettings, setReminder, getReminders } from "./core/settings.js";
+import { mountAskButton } from "./ui/ask.js";
+import { shouldShowWalkthrough } from "./core/walkthrough.js";
+import { openWalkthrough } from "./ui/walkthrough.js";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 
 const view = $("#view");
 const store = await createStore();
@@ -38,7 +42,7 @@ const ctx = {
     return ctx.items;
   },
   onSold(item) {
-    // Immediate loud reminder at the moment of sale.
+    // Immediate loud reminder at the moment of sale — unless Pause all is on.
     maybeNotify(item, { force: true });
     updateChrome();
   },
@@ -60,18 +64,30 @@ const SCREEN_NAMES = {
   item: "Item",
   settings: "Settings",
   scan: "Buy or pass",
-  taxes: "Taxes"
+  taxes: "Taxes",
+  sites: "Site limits"
 };
 
 function render() {
   const { head, rest } = parseHash();
-  const tab = head === "item" ? "items" : (head === "taxes" ? "home" : (head || "home"));
+  const tab = head === "item" ? "items"
+    : (head === "taxes" ? "home"
+    : (head === "sites" ? "settings" : (head || "home")));
   document.querySelectorAll(".tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === tab));
   ctx.screen = SCREEN_NAMES[head] || head;
   if (head === "item" && rest[0]) {
     const item = ctx.items.find(i => i.id === rest[0]);
     ctx.screen = item && item.title ? item.title : "Item";
     renderItem(ctx, view, item);
+    if (item && rest[1] === "takedown") {
+      // Drop the /takedown segment so a re-render doesn't retrigger, then start the guided flow.
+      history.replaceState(null, "", "#/item/" + item.id);
+      queueMicrotask(() => {
+        const btn = document.getElementById("takedown-all");
+        if (btn) btn.click();
+        else toast("Open the item and use Take them all down automatically, or the checklist.");
+      });
+    }
   } else if (head === "add") {
     renderAdd(ctx, view);
   } else if (head === "items") {
@@ -82,6 +98,8 @@ function render() {
     renderScan(ctx, view);
   } else if (head === "taxes") {
     renderTaxes(ctx, view, rest[0]);
+  } else if (head === "sites") {
+    renderCompat(ctx, view);
   } else {
     ctx.screen = "Home";
     renderHome(ctx, view);
@@ -104,6 +122,7 @@ function updateChrome() {
 }
 
 function maybeNotify(item, { force = false } = {}) {
+  if (getSettings().pauseAutomation) return false;
   const last = (getReminders()[item.id] || {}).lastAt;
   if (!force && !shouldRemind(item, last, Date.now())) return false;
   const msg = reminderBody(item);
@@ -124,12 +143,12 @@ function maybeNotify(item, { force = false } = {}) {
 
 function tickReminders() {
   updateChrome();
+  if (getSettings().pauseAutomation) return;
   const items = attentionItems(ctx.items);
   if (!items.length) return;
   const reminders = getReminders();
   for (const item of items) {
     maybeNotify(item, { force: false });
-    // Touch lastAt read — maybeNotify already schedules.
     void reminders;
     void delistCountdown; // countdown is rendered on the item page
   }
@@ -141,11 +160,21 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) tick
 window.addEventListener("hashchange", render);
 $("#suggest-open").addEventListener("click", () => openSuggest({ version: VERSION, screen: ctx.screen }));
 
+mountAskButton({
+  version: VERSION,
+  getScreen: () => ctx.screen
+});
+
 const swOK = "serviceWorker" in navigator && !/[?&]nosw\b/.test(location.search);
 if (swOK) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 
 render();
 tickReminders();
+
+// First-run walkthrough: skippable, 4 short screens. Tests can skip it first.
+if (shouldShowWalkthrough() && !window.__flipQuiet && !/[?&]nowalk\b/.test(location.search)) {
+  openWalkthrough();
+}
 
 // Exposed for smoke tests only. Not a public API. Never includes the AI key.
 window.__flip = {
