@@ -134,7 +134,7 @@ export function restoreOriginals(item, { photos = false, at = Date.now() } = {})
  * Keep the original pixels when a photo is cleaned up. `dataUrl` is the new
  * (cleaned) picture; the first original is preserved on originalDataUrl.
  */
-export function applyCleanedPhoto(photos, index, dataUrl, at = Date.now()) {
+export function applyCleanedPhoto(photos, index, dataUrl, at = Date.now(), { kind = "basic" } = {}) {
   const list = Array.isArray(photos) ? photos.slice() : [];
   const prev = list[index];
   if (!prev) return list;
@@ -143,7 +143,7 @@ export function applyCleanedPhoto(photos, index, dataUrl, at = Date.now()) {
     dataUrl,
     originalDataUrl: prev.originalDataUrl || prev.dataUrl,
     cleanedAt: at,
-    cleaned: "basic"
+    cleaned: kind || "basic"
   };
   return list;
 }

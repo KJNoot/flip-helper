@@ -1,6 +1,6 @@
 {
   "name": "flip-helper",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "private": true,
   "description": "Jessika's Flip Side: take a photo, draft a listing, and keep track of what you sell. iPhone-first PWA.",
   "type": "module",

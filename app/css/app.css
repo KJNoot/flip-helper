@@ -217,6 +217,27 @@ h4{margin:0 0 6px;font-size:.95rem}
 .chiplink.soldfilter{box-shadow:inset 0 0 0 2px var(--ok);color:var(--ok)}
 .cleanup-preview{margin:10px 0;border-radius:16px;overflow:hidden;background:var(--soft);aspect-ratio:1;display:grid;place-items:center}
 .cleanup-preview img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
+.ba{position:relative;border-radius:16px;overflow:hidden;background:#f3f3f3;aspect-ratio:1;max-height:32vh;margin:8px 0;touch-action:none;user-select:none}
+.ba.is-tall{aspect-ratio:4/5}
+.ba-img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#fff;pointer-events:none;display:block}
+.ba-clip{position:absolute;inset:0 auto 0 0;width:calc(var(--split,50)*1%);overflow:hidden;border-right:2px solid #fff;z-index:1}
+.ba-clip .ba-img{width:calc(100cqi * 100 / var(--split,50));width:calc(100% * 100 / var(--split,50));max-width:none;height:100%;left:0;right:auto}
+.ba-handle{position:absolute;top:0;bottom:0;left:calc(var(--split,50)*1%);width:22px;margin-left:-11px;z-index:2;pointer-events:none}
+.ba-handle::before{content:"";position:absolute;top:50%;left:50%;width:28px;height:28px;margin:-14px 0 0 -14px;border-radius:50%;background:#fff;box-shadow:0 1px 6px rgba(0,0,0,.28)}
+.ba-handle::after{content:"";position:absolute;inset:0;width:2px;left:50%;margin-left:-1px;background:#fff}
+.ba-range{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;z-index:3;cursor:ew-resize;appearance:none;-webkit-appearance:none;background:transparent}
+.ba-tag{position:absolute;top:8px;z-index:4;font-size:.68rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;background:rgba(0,0,0,.45);color:#fff;padding:3px 8px;border-radius:999px;pointer-events:none}
+.ba-tag-before{left:8px}
+.ba-tag-after{right:8px}
+.studio-thumbs{display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0 4px;padding:2px}
+.studio-thumb{flex:0 0 56px;width:56px;height:56px;padding:0;border:0;border-radius:10px;overflow:hidden;background:var(--soft);box-shadow:inset 0 0 0 2px transparent;cursor:pointer}
+.studio-thumb.on{box-shadow:inset 0 0 0 2px var(--a1)}
+.studio-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.studio-sheet .seg button{flex:1 1 0;min-width:0;padding:0 8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.studio-sheet .studio-bg-seg,.studio-sheet .studio-aspect-seg{margin-bottom:4px}
+.studio-sheet #studio-bg-note,.studio-sheet #studio-aspect-note{margin:0 0 8px}
+.studio-cover{margin-top:8px}
+
 #sitescard,#advice,#delist,#review,#comps,#drops,#shipsuggest,#scan-results,#mileage,#taxcard{scroll-margin-top:calc(var(--sat) + var(--headh) + 12px)}
 
 @media print{

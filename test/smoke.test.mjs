@@ -245,7 +245,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Jessika's Flip Side v0\.6\.1/);
+    assert.match(await text(), /Jessika's Flip Side v0\.7\.0/);
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);
@@ -1033,6 +1033,166 @@ try {
     }
     await p4.unroute("https://api.openai.com/v1/chat/completions");
     await p4.close();
+  });
+
+  await step("v0.7.0 studio photo: real U²-Netp model, sheet UI, and a 12MP timing run", async () => {
+    const p7 = await context.newPage();
+    p7.setDefaultTimeout(120000);
+    p7.on("pageerror", e => { errors.push("pageerror v7: " + e.message); console.log("  v7 page error:", e.message); });
+    const v7Base = `http://127.0.0.1:${srv.address().port}/index.html?nosw&nointro&nowalk&noterms`;
+    await p7.goto(v7Base);
+    await p7.waitForSelector("html[data-ready='1']");
+    await p7.evaluate(() => {
+      window.__flipFast = true;
+      window.__flipQuiet = true;
+      localStorage.setItem("flip-helper.introDone", "1");
+      localStorage.setItem("flip-helper.walkthroughDone", "1");
+    });
+
+    const beforePath = "/tmp/studio-model/v7-before-src.png";
+    const beforeB64 = readFileSync(beforePath).toString("base64");
+    const beforeUrl = "data:image/png;base64," + beforeB64;
+
+    const api = await p7.evaluate(async (beforeUrl) => {
+      const { makeStudioPhoto } = await import("./js/core/segment.js");
+      const mug = await makeStudioPhoto(beforeUrl, {
+        background: "white", shadow: true, straighten: true, center: true, aspect: "square", edge: 2000
+      });
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = beforeUrl; });
+      const c = document.createElement("canvas");
+      c.width = 4032; c.height = 3024;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#6a4a32";
+      ctx.fillRect(0, 0, 4032, 3024);
+      for (let y = 0; y < 3024; y += 24) {
+        ctx.fillStyle = y % 48 === 0 ? "#7a5a40" : "#5c3e28";
+        ctx.fillRect(0, y, 4032, 20);
+      }
+      const side = 2000;
+      ctx.drawImage(img, (4032 - side) / 2, (3024 - side) / 2, side, side);
+      const bigUrl = c.toDataURL("image/jpeg", 0.85);
+      const heapBefore = performance.memory ? performance.memory.usedJSHeapSize : null;
+      const t0 = performance.now();
+      const big = await makeStudioPhoto(bigUrl, {
+        background: "white", shadow: true, straighten: true, center: true, aspect: "square", edge: 2000
+      });
+      const wall = performance.now() - t0;
+      const heapAfter = performance.memory ? performance.memory.usedJSHeapSize : null;
+      const toPng = src => new Promise((res, rej) => {
+        const i = new Image();
+        i.onload = () => {
+          const cv = document.createElement("canvas");
+          cv.width = i.naturalWidth; cv.height = i.naturalHeight;
+          cv.getContext("2d").drawImage(i, 0, 0);
+          res(cv.toDataURL("image/png"));
+        };
+        i.onerror = rej;
+        i.src = src;
+      });
+      return {
+        mug: {
+          ok: mug.ok, fallback: mug.fallback, kind: mug.kind, width: mug.width, height: mug.height,
+          elapsedMs: mug.elapsedMs, error: mug.error || "", usedShadow: mug.usedShadow,
+          usedStraighten: mug.usedStraighten, straightenDeg: mug.straightenDeg,
+          dataUrl: mug.dataUrl, beforePng: await toPng(beforeUrl), afterPng: mug.dataUrl ? await toPng(mug.dataUrl) : null
+        },
+        big: {
+          ok: big.ok, fallback: big.fallback, kind: big.kind, width: big.width, height: big.height,
+          elapsedMs: big.elapsedMs, wall, error: big.error || "",
+          heapMB: heapBefore != null ? { before: Math.round(heapBefore / 1e6), after: Math.round(heapAfter / 1e6) } : null
+        }
+      };
+    }, beforeUrl);
+
+    console.log("  studio mug:", JSON.stringify({ ...api.mug, dataUrl: undefined, beforePng: undefined, afterPng: undefined }));
+    console.log("  studio 12MP:", JSON.stringify(api.big));
+    assert.equal(api.mug.ok, true, "studio must succeed on the sample: " + api.mug.error);
+    assert.equal(api.mug.fallback, false);
+    assert.equal(api.mug.kind, "studio");
+    assert.equal(api.mug.width, 2000);
+    assert.equal(api.mug.height, 2000);
+    assert.equal(api.mug.usedShadow, true);
+    assert.ok(api.mug.elapsedMs > 0 && api.mug.elapsedMs < 60000, "per-photo time " + api.mug.elapsedMs);
+    assert.equal(api.big.ok, true, "12MP studio must succeed: " + api.big.error);
+    assert.equal(api.big.fallback, false);
+    assert.equal(api.big.width, 2000);
+    writeFileSync(join(SHOTS, "v7-before.png"), Buffer.from(api.mug.beforePng.split(",")[1], "base64"));
+    writeFileSync(join(SHOTS, "v7-after.png"), Buffer.from(api.mug.afterPng.split(",")[1], "base64"));
+    writeFileSync("/tmp/studio-model/timing.json", JSON.stringify({ mug: api.mug.elapsedMs, mugStraighten: api.mug.straightenDeg, big: api.big, at: Date.now() }, null, 2));
+    console.log("  shot v7-before.png and v7-after.png");
+
+    await p7.evaluate(({ photo, now }) => {
+      return window.__flip.save({
+        id: "it_studio_v7",
+        createdAt: now,
+        updatedAt: now,
+        title: "Speckled ceramic mug",
+        description: "A handmade speckled mug.",
+        category: "Kitchen",
+        condition: "Good",
+        photos: [
+          { dataUrl: photo, addedAt: now },
+          { dataUrl: photo, addedAt: now }
+        ]
+      });
+    }, { photo: beforeUrl, now: Date.now() });
+    await p7.evaluate(() => window.__flip.go("#/item/it_studio_v7"));
+    await p7.waitForSelector('[data-act="cleanup"]');
+    const itemText = await p7.textContent("#view");
+    assert.match(itemText, /Make it look pro/);
+    assert.match(itemText, /Recommended/);
+    assert.doesNotMatch(itemText, /Clean up photos \(basic\)/);
+    await p7.click('[data-act="cleanup"]');
+    await p7.waitForSelector(".studio-sheet");
+    const sheetTxt = await p7.textContent(".studio-sheet");
+    assert.match(sheetTxt, /Make it look pro/);
+    assert.match(sheetTxt, /Recommended/);
+    assert.match(sheetTxt, /Check that flaws are still visible/);
+    assert.match(sheetTxt, /does not hide damage/i);
+    assert.match(sheetTxt, /Pure white/);
+    assert.match(sheetTxt, /Soft gray/);
+    assert.match(sheetTxt, /Keep original/);
+    assert.match(sheetTxt, /Square \(1:1\)/);
+    assert.match(sheetTxt, /Tall \(4:5\)/);
+    assert.match(sheetTxt, /Do all photos/);
+    assert.match(sheetTxt, /Use a basic clean-up instead/);
+    assert.match(sheetTxt, /Edges look off/);
+    assert.match(sheetTxt, /Try again/);
+    assert.match(sheetTxt, /Cover photo check|Paste the AI key/);
+    assert.ok(await p7.locator("#studio-ba-range").count(), "before/after slider");
+    await p7.waitForFunction(() => {
+      const el = document.querySelector("#studio-progress");
+      const img = document.querySelector("#studio-after");
+      if (!el || !img || !img.naturalWidth) return false;
+      return /Studio photo ready|basic clean-up/i.test(el.textContent);
+    }, { timeout: 90000 });
+    const progress = await p7.textContent("#studio-progress");
+    assert.match(progress, /Studio photo ready/);
+    assert.doesNotMatch(progress, /couldn't start/);
+    await p7.evaluate(() => {
+      const range = document.querySelector("#studio-ba-range");
+      const ba = document.querySelector("#studio-ba");
+      if (range && ba) {
+        range.value = "50";
+        ba.style.setProperty("--split", "50");
+      }
+    });
+    await p7.waitForTimeout(300);
+    const sheetShot = `${OUT}${String(++n).padStart(2, "0")}-v7-sheet.png`;
+    await p7.locator(".studio-sheet").screenshot({ path: sheetShot });
+    copyFileSync(sheetShot, join(SHOTS, "v7-sheet.png"));
+    console.log("  shot v7-sheet.png");
+
+    await p7.click('[data-r="basic"]');
+    await p7.waitForFunction(() => {
+      const el = document.querySelector("#studio-progress");
+      return el && /Basic preview ready|basic/i.test(el.textContent);
+    }, { timeout: 15000 });
+    const basicPanel = await p7.textContent("#studio-basic-panel");
+    assert.match(basicPanel, /not a studio cut-out/);
+    await p7.click('[data-r="0"]');
+
+    await p7.close();
   });
 
   if (errors.length) {

@@ -553,13 +553,13 @@ describe("guide, walkthrough, version, and privacy", () => {
     for (const s of WALKTHROUGH_SCREENS) assert.ok(s.body.length < 500);
   });
 
-  it("bumps the app, package, and service worker to v0.6.1 and caches the new modules", () => {
+  it("bumps the app, package, and service worker to v0.7.0 and caches the new modules", () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.6.1");
+    assert.equal(pkg.version, "0.7.0");
     const main = readFileSync(join(APP, "js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.6\.1"/);
+    assert.match(main, /export const VERSION = "0\.7\.0"/);
     const sw = readFileSync(join(APP, "sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.6\.1/);
+    assert.match(sw, /flip-helper-v0\.7\.0/);
     assert.match(sw, /js\/core\/secondlook\.js/);
     assert.match(sw, /js\/ui\/screens\/secondlook\.js/);
     assert.doesNotMatch(sw, /media\/intro\.mp4/);

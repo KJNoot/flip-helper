@@ -16,7 +16,7 @@ import { getSettings, addTrip, mileageRateFor, ymd, PAUSE_NOTE_ON } from "../../
 import { heuristicShip, normalizeShipSuggest, shippingEstimates, boxSizeLabel, labelLinksFor, SHIP_TABLE_NOTE, effectiveShipCost, packedDims, applyBoxToItem } from "../../core/shipping.js";
 import { hasKey } from "../../core/key.js";
 import { openCleanup } from "../cleanup.js";
-import { PHOTO_CLEANUP_NOTE } from "../../core/photo.js";
+import { STUDIO_NOTE, STUDIO_BUTTON } from "../../core/studio.js";
 import {
   SITE_STATUS_NOTE, siteStatusList, siteStatusOf, confirmSiteDone, retrySiteStatus,
   startGuidedTakedown, guidedCurrent, advanceGuidedTakedown,
@@ -68,9 +68,12 @@ export function renderItem(ctx, el, item) {
         <label class="photo add"><input id="cam" type="file" accept="image/*" capture="environment" hidden><span>📷</span></label>
         <label class="photo add"><input id="lib" type="file" accept="image/*" multiple hidden><span>🖼</span></label>` : ""}
     </div>
-    ${photos.length ? `<div class="row wrap" style="margin-top:10px;gap:8px">
-      <button type="button" class="btn soft sm" data-act="cleanup">Clean up photos (basic)</button>
-      ${photos.some(photoHasOriginal) ? `<button type="button" class="btn soft sm" data-act="restorephoto">Restore original photo</button>` : ""}
+    ${photos.length ? `<div style="margin-top:10px">
+      <div class="row wrap" style="gap:8px">
+        <button type="button" class="btn" data-act="cleanup">${esc(STUDIO_BUTTON)}</button>
+        ${photos.some(photoHasOriginal) ? `<button type="button" class="btn soft sm" data-act="restorephoto">Restore original photo</button>` : ""}
+      </div>
+      <p class="tiny muted" style="margin-top:6px"><span class="honesty ok">Recommended</span> ${esc(STUDIO_NOTE)}</p>
     </div>` : ""}
 
     ${alert ? delistCard(item, targets, pending, countdown, settings) : (item.soldAt && targets.length && isFullyDelisted(item) ? `<div class="card okbox"><p>All other listings are checked off. Nice work.</p></div>` : "")}
@@ -181,14 +184,30 @@ export function renderItem(ctx, el, item) {
       await ctx.save(next); ctx.render();
     },
     cleanup: () => {
-      const first = (item.photos || [])[0];
-      if (!first) { toast("Take a photo first"); return; }
+      const photos = item.photos || [];
+      if (!photos.length) { toast("Take a photo first"); return; }
+      const toastFor = (kind, many) => {
+        if (kind === "studio") toast(many ? "Studio photos ready. The originals are kept. Check that flaws are still visible." : "Studio photo ready. The original is kept. Check that flaws are still visible.");
+        else toast(many ? "Photos cleaned up (basic). The originals are kept." : "Photo cleaned up (basic). The original is kept.");
+      };
       openCleanup({
-        dataUrl: first.originalDataUrl || first.dataUrl,
-        onApply: async (dataUrl) => {
-          const photos = applyCleanedPhoto(item.photos || [], 0, dataUrl);
-          await ctx.save(captureOriginals({ ...item, photos }));
-          toast("Photo cleaned up (basic). The original is kept.");
+        photos,
+        index: 0,
+        onApply: async (dataUrl, { index = 0, kind = "studio" } = {}) => {
+          const next = applyCleanedPhoto(item.photos || [], index, dataUrl, Date.now(), { kind });
+          await ctx.save(captureOriginals({ ...item, photos: next }));
+          toastFor(kind, false);
+          ctx.render();
+        },
+        onApplyAll: async (results) => {
+          let list = item.photos || [];
+          const at = Date.now();
+          (results || []).forEach((r, i) => {
+            if (r && r.dataUrl) list = applyCleanedPhoto(list, i, r.dataUrl, at, { kind: r.kind || "studio" });
+          });
+          await ctx.save(captureOriginals({ ...item, photos: list }));
+          const anyBasic = (results || []).some(r => r && r.kind === "basic");
+          toastFor(anyBasic && !(results || []).some(r => r && r.kind === "studio") ? "basic" : "studio", true);
           ctx.render();
         }
       });
