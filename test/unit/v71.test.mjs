@@ -35,7 +35,7 @@ function rectMask(W, H, x, y, w, h, v = 1) {
   return m;
 }
 
-describe("v0.7.2 never upscale past the source", () => {
+describe("v0.7.3 never upscale past the source", () => {
   it("caps scale at 1.0 by default, and pads more instead of enlarging", () => {
     assert.equal(STUDIO_MAX_SCALE, 1);
     const b = { x: 10, y: 10, w: 40, h: 30 };
@@ -89,7 +89,7 @@ describe("v0.7.2 never upscale past the source", () => {
   });
 });
 
-describe("v0.7.2 mask quality at full resolution", () => {
+describe("v0.7.3 mask quality at full resolution", () => {
   it("erodes a solid square by about the requested radius", () => {
     const W = 40, H = 40;
     const m = rectMask(W, H, 10, 10, 20, 20);
@@ -403,8 +403,8 @@ describe("column envelope drops clutter under a blade whose ends sit lower", () 
   });
 });
 
-describe("v0.7.2 version", () => {
-  it("exports the new quality knobs and bumps the app to 0.7.2", () => {
+describe("v0.7.3 version", () => {
+  it("exports the new quality knobs and bumps the app to 0.7.3", () => {
     assert.equal(STUDIO_ERODE_PX, 1);
     assert.ok(STUDIO_FEATHER_PX >= 1 && STUDIO_FEATHER_PX <= 2);
     assert.equal(STUDIO_EXPORT_EDGE, 2000);
@@ -412,8 +412,8 @@ describe("v0.7.2 version", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.equal(pkg.version, "0.7.2");
-    assert.match(main, /export const VERSION = "0\.7\.2"/);
-    assert.match(sw, /flip-helper-v0\.7\.2/);
+    assert.equal(pkg.version, "0.7.3");
+    assert.match(main, /export const VERSION = "0\.7\.3"/);
+    assert.match(sw, /flip-helper-v0\.7\.3/);
   });
 });

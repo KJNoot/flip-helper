@@ -72,7 +72,8 @@ describe("v0.7.0 studio photo math", () => {
     assert.equal(STUDIO_LABEL, "studio");
     assert.equal(STUDIO_RECOMMENDED, "Recommended");
     assert.match(STUDIO_NOTE, /does not hide damage/i);
-    assert.match(STUDIO_NOTE, /does not blur or smooth/i);
+    assert.match(STUDIO_NOTE, /keeps the real background/i);
+    assert.match(STUDIO_NOTE, /white studio cutout is still a choice/i);
     assert.match(STUDIO_NOTE, /Check that flaws are still visible/);
     assert.match(STUDIO_NOTE, /on this phone/);
     assert.match(STUDIO_FALLBACK_MSG, /basic clean-up/i);
@@ -511,13 +512,13 @@ describe("v0.7.0 studio photo math", () => {
 
 
 describe("v0.7.0 wiring, version, and service worker", () => {
-  it("bumps the app, package, and service worker to v0.7.2 and caches studio modules but not the model", () => {
+  it("bumps the app, package, and service worker to v0.7.3 and caches studio modules but not the model", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.7.2");
+    assert.equal(pkg.version, "0.7.3");
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.7\.2"/);
+    assert.match(main, /export const VERSION = "0\.7\.3"/);
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.7\.2/);
+    assert.match(sw, /flip-helper-v0\.7\.3/);
     assert.match(sw, /js\/core\/studio\.js/);
     assert.match(sw, /js\/core\/segment\.js/);
     assert.match(sw, /js\/core\/studio-worker\.js/);

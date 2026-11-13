@@ -16,6 +16,7 @@ import {
   columnEnvelope, keepInsideEnvelope
 } from "./studio.js";
 import { cleanupDataUrl } from "./photo.js";
+import { enhancePhoto, isEnhanceOptions, ENHANCE_PROGRESS } from "./enhance.js";
 
 export const ORT_VERSION = "1.21.0";
 export const ORT_WASM_BUNDLE = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/ort.wasm.bundle.min.mjs`;
@@ -331,7 +332,9 @@ export function pixelsToJpegDataUrl(pixels, { quality = STUDIO_QUALITY } = {}) {
 }
 
 export function renderStudioJpeg(source, options) {
-  const result = renderStudio(source, options);
+  const result = isEnhanceOptions(options)
+    ? enhancePhoto(source, options)
+    : renderStudio(source, options);
   return { ...result, dataUrl: pixelsToJpegDataUrl(result), ok: true, fallback: false, source };
 }
 
@@ -344,8 +347,8 @@ export async function makeStudioPhoto(dataUrl, options = {}, { onProgress } = {}
   const elapsed = () => ((typeof performance !== "undefined" && performance.now) ? performance.now() : Date.now()) - t0;
   try {
     const pixels = await pixelsFromDataUrl(dataUrl);
-    progress(onProgress, "infer", STUDIO_PROGRESS_WORKING);
-    const result = await studioOrBasic(pixels, options, {
+    progress(onProgress, "infer", isEnhanceOptions(options) ? ENHANCE_PROGRESS : STUDIO_PROGRESS_WORKING);
+    const result = await studioOrBasic(pixels, { ...options, enhance: enhancePhoto }, {
       inferMask: src => inferMask(src, { onProgress }),
       cleanup: cleanupDataUrl,
       dataUrl,
@@ -361,7 +364,7 @@ export async function makeStudioPhoto(dataUrl, options = {}, { onProgress } = {}
       basic = await cleanupDataUrl(dataUrl, {
         brighten: true,
         square: true,
-        whiteBackground: options.background !== "original"
+        whiteBackground: options.background !== "original" && options.background !== "enhance"
       });
     } catch (_) { /* ignore */ }
     return {
