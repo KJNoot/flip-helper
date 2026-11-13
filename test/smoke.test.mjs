@@ -77,7 +77,7 @@ try {
 
   await step("walkthrough is skippable and Ask a question is always visible", async () => {
     assert.ok(await page.isVisible("#walkthrough"), "first-run walkthrough opens");
-    assert.match(await page.textContent("#walkthrough"), /Welcome to Jessica's Flip Side/);
+    assert.match(await page.textContent("#walkthrough"), /Welcome to Jessika's Flip Side/);
     assert.match(await page.textContent("#walkthrough"), /1 of 4/);
     await shot("walkthrough", { also: "v3-walkthrough.png" });
     assert.ok(await page.isVisible('#walkthrough [data-r="skip"]'));
@@ -95,9 +95,9 @@ try {
 
   await step("home: empty, suggestion, honesty, totals at zero", async () => {
     await go("#/home");
-    assert.equal(await page.title(), "Jessica's Flip Side");
-    assert.equal(await page.getAttribute(".apphead-brand", "aria-label"), "Jessica's Flip Side");
-    assert.match(await page.textContent(".apphead-brand"), /Jessica.?s/);
+    assert.equal(await page.title(), "Jessika's Flip Side");
+    assert.equal(await page.getAttribute(".apphead-brand", "aria-label"), "Jessika's Flip Side");
+    assert.match(await page.textContent(".apphead-brand"), /Jessika.?s/);
     assert.match(await page.textContent(".apphead-brand"), /Flip Side/);
     assert.ok(await page.isVisible("#suggest-open"), "Send a suggestion is on every screen");
     assert.match(await text(), /Take a photo/);
@@ -132,7 +132,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Jessica's Flip Side v0\.3\.1/);
+    assert.match(await text(), /Jessika's Flip Side v0\.3\.2/);
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);
@@ -246,7 +246,7 @@ try {
     assert.match(await text(), /Take them all down automatically/);
     const badge = await page.textContent("#items-badge");
     assert.ok(badge && Number(badge) >= 1, "Items tab shows a take-down badge");
-    await shot("home", { also: ["01-home.png", "v31-home.png"] });
+    await shot("home", { also: ["01-home.png", "v32-home.png"] });
     await page.locator("#delist-alerts").scrollIntoViewIfNeeded();
     await shot("home-takedown", { also: "v3-home.png" });
   });

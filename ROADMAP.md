@@ -1,4 +1,4 @@
-# Jessica's Flip Side — roadmap to the full version
+# Jessika's Flip Side — roadmap to the full version
 
 This is the plan for later, after the tester has used the iPhone helper. Parts of v0.2 and v0.3 (the take-down checklist with reminders and a guided walk-through, sold-price links, fee tables, Buy or pass, Ask a question, and the rest of the complete phone app) are already in the phone app. Automatic take-down and official sold prices are not built yet, and nothing is promised for a date. The goal is the same one Ken described: she takes a photo, approves a draft, and the item is listed on her sites; when it sells on one, it comes down on the others. That has to be done in a way that is legal, official where official doors exist, and honest where they do not.
 
@@ -8,7 +8,7 @@ v0.3 (this release) is the complete iPhone helper: photo, AI draft, Buy or pass,
 
 Long term, two kinds of help:
 
-1. **Official connections**, where the selling site has a real public (or partner) program. She signs in on that site's own "allow this app" screen. Jessica's Flip Side can then list and take down on her behalf, with her permission, and it can work with the computer off.
+1. **Official connections**, where the selling site has a real public (or partner) program. She signs in on that site's own "allow this app" screen. Jessika's Flip Side can then list and take down on her behalf, with her permission, and it can work with the computer off.
 2. **A desktop companion** on a computer she leaves running, for sites that have no official door. It would run in her own browser, where she is already signed in. It would only act after she clearly approves the action. It would not ask for her selling-site passwords, and it would not try to sneak around a site's rules.
 
 The phone app stays the place she takes photos, reviews drafts, and sees what is listed, sold, or still up. The computer does the clicking only where that is allowed and only with her OK.
@@ -49,8 +49,8 @@ The phone app stays the place she takes photos, reviews drafts, marks a sale, an
 
 A simple, honest design:
 
-- The phone inventory is the source of truth (on her device). When she marks an item sold, Jessica's Flip Side records which other sites still need a take-down, with a timestamp.
-- A tiny companion app on her computer (a window she leaves open, or a browser extension she installed) checks that list. It can do this by talking to a local address on her computer (`localhost`), which the phone reaches when both are on her home network, or — simpler at first — by her opening Jessica's Flip Side on the computer in the same browser profile she uses to sell. We do not send her inventory to a Jessica's Flip Side server. We do not put customer data in a public repo.
+- The phone inventory is the source of truth (on her device). When she marks an item sold, Jessika's Flip Side records which other sites still need a take-down, with a timestamp.
+- A tiny companion app on her computer (a window she leaves open, or a browser extension she installed) checks that list. It can do this by talking to a local address on her computer (`localhost`), which the phone reaches when both are on her home network, or — simpler at first — by her opening Jessika's Flip Side on the computer in the same browser profile she uses to sell. We do not send her inventory to a Jessika's Flip Side server. We do not put customer data in a public repo.
 - For an official API site, the companion (or the phone) sends the official "end this listing" request, then marks that site done and tells her it worked.
 - For a helper site, the companion shows a card: "Take down [item] on [site]?" with a preview. She taps Approve. Only then does it perform the take-down in her already-open, already-signed-in tab. If she says no, the phone checklist stays.
 - If anything fails (the site changed, she was signed out, the network dropped), the companion marks that site as failed, and the phone shows a loud warning: "Still listed on [site]. Please take it down yourself." Reminders continue. We never pretend a take-down worked if we did not get a clear success.
@@ -59,7 +59,7 @@ Timing: the goal is minutes after a sale is marked, not hours. Official APIs can
 
 ### Rules for the companion, if we build it
 
-- It runs on **her** computer, in **her** already-signed-in browser. Jessica's Flip Side never asks for a Poshmark, Mercari, or Facebook password.
+- It runs on **her** computer, in **her** already-signed-in browser. Jessika's Flip Side never asks for a Poshmark, Mercari, or Facebook password.
 - It **only acts after her approval**. A listing is not posted, and a listing is not taken down, until she confirms that one action (or a clearly listed batch she reviews). It is not a silent always-on clicker.
 - **Each site's terms are reviewed before that site is turned on** in the companion. If the rules forbid unauthorized automation — Poshmark's guidelines say this today — that site is not included, and the phone app keeps the honest checklist instead.
 - User-initiated actions (she taps "Open Poshmark" and posts herself) are always fine.

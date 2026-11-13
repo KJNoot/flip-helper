@@ -267,7 +267,7 @@ function haulBlock(ctx) {
   const pending = pendingHaulItems(batch, ctx.items);
   return `<div class="card" id="haul">
     <div class="row between"><h3>The whole haul</h3>${honesty("ok", "Working")}</div>
-    <p class="small muted">Take a photo of each item. Jessica's Flip Side will make a separate draft for each one. If you leave and come back, it will pick up where you left off, without creating duplicates.</p>
+    <p class="small muted">Take a photo of each item. Jessika's Flip Side will make a separate draft for each one. If you leave and come back, it will pick up where you left off, without creating duplicates.</p>
     <div class="photos">
       ${items.map(r => `<div class="photo">
         <img src="${esc(r.photo && r.photo.dataUrl || "")}" alt="">

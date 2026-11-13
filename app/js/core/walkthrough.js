@@ -9,7 +9,7 @@ function store(injected) {
 export const WALKTHROUGH_SCREENS = [
   {
     id: "welcome",
-    title: "Welcome to Jessica's Flip Side",
+    title: "Welcome to Jessika's Flip Side",
     body: "This app helps you sell something on more than one site. Take a photo, get a draft listing, and keep track from listed to sold to shipped.",
     extra: "There is no account to create. Everything stays on this phone, except when you ask for a draft from a photo."
   },
@@ -22,7 +22,7 @@ export const WALKTHROUGH_SCREENS = [
   {
     id: "sell",
     title: "List it, then take it down when it sells",
-    body: "Open an item and tap “Copy for” a site, then post it in that site's own app. Tick the site so Jessica's Flip Side can keep track. When it sells, tap “Mark as sold”. If it's still listed elsewhere, a loud card will help you take it down so it doesn't sell twice.",
+    body: "Open an item and tap “Copy for” a site, then post it in that site's own app. Tick the site so Jessika's Flip Side can keep track. When it sells, tap “Mark as sold”. If it's still listed elsewhere, a loud card will help you take it down so it doesn't sell twice.",
     extra: "This app cannot promise a double sale is impossible. Please still check."
   },
   {

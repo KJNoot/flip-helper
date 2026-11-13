@@ -282,7 +282,7 @@ describe("backup export", () => {
     assert.equal(back[0].stage, "listed");
   });
   it("rejects a file from another app", () => {
-    assert.throws(() => importPayload({ app: "other", items: [] }), /not a Jessica's Flip Side/);
+    assert.throws(() => importPayload({ app: "other", items: [] }), /not a Jessika's Flip Side/);
     assert.throws(() => importPayload("nope"), /couldn't be read/);
     assert.throws(() => importPayload({ app: "flip-helper" }), /no items/);
   });

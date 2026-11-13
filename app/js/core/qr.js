@@ -462,7 +462,7 @@ export function qrDataUrl(text, opts) {
   return "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 }
 
-/** Payload encoded in a Jessica's Flip Side item label. Short and stable. */
+/** Payload encoded in a Jessika's Flip Side item label. Short and stable. */
 export function itemQrPayload(item) {
   const id = item && item.id ? String(item.id) : "";
   return "FH:" + id;
