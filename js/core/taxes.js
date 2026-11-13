@@ -105,7 +105,7 @@ function soldDate(item) {
 
 export function yearCsv(totals) {
   const lines = [];
-  lines.push("Jessica's Flip Side tax summary");
+  lines.push("Jessika's Flip Side tax summary");
   lines.push(`Year,${totals.year}`);
   lines.push("Not tax advice. This is a record of what you entered.");
   lines.push("");
@@ -166,7 +166,7 @@ export function yearCsv(totals) {
 export function yearSummaryText(totals) {
   const t = totals;
   const rows = [
-    `Jessica's Flip Side — ${t.year} summary`,
+    `Jessika's Flip Side — ${t.year} summary`,
     "",
     TAX_DISCLAIMER,
     "",
