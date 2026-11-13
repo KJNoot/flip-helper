@@ -1,9 +1,9 @@
-// A short built-in guide to every Flip Helper feature, in plain words.
+// A short built-in guide to every Jessica's Flip Side feature, in plain words.
 // Used by the "Ask a question" helper so it can say which button to tap.
 // This is not shown as a manual — it's context for the helper.
 
 export const FEATURE_GUIDE = `
-Flip Helper is a pocket app for people who sell used items on more than one site (eBay, Poshmark, Mercari, Facebook Marketplace, Etsy, and others). It runs on an iPhone in Safari, and can be added to the Home Screen. There is no account and no subscription in this test version. The complete app is included; nothing essential is locked.
+Jessica's Flip Side is a pocket app for people who sell used items on more than one site (eBay, Poshmark, Mercari, Facebook Marketplace, Etsy, and others). It runs on an iPhone in Safari, and can be added to the Home Screen. There is no account and no subscription in this test version. The complete app is included; nothing essential is locked.
 
 The main button at the bottom of the phone is a row of tabs: Home, Items, Scan, Add, Settings. At the top right is "Send a suggestion". A floating "Ask a question" button is on every screen. A "Send a suggestion" button is also in the header.
 
@@ -17,7 +17,7 @@ Item page: The item's photos, title, and status. If it sold and is still up on o
 
 Each site on an item has a status you set yourself: Draft, Pending, Live, Sold, Removed, Failed, or Needs a manual step, with the last check time and a Retry or "I did it" button. Automatic checks are coming later.
 
-"Post it" is how you list: "Copy for [site]" copies the listing, "Open [site] sell page" opens that site, then tick the site once you've posted. Flip Helper does not log into selling sites and does not post for you in this version.
+"Post it" is how you list: "Copy for [site]" copies the listing, "Open [site] sell page" opens that site, then tick the site once you've posted. Jessica's Flip Side does not log into selling sites and does not post for you in this version.
 
 Tap "Mark as sold" to record a sale (site, sale price, fees, shipping). You'll get the take-down checklist. Profit is sale minus cost, marketplace fees, payment fees, postage, supplies, discounts, and refunds. Estimated profit and money received are shown separately.
 
@@ -39,10 +39,10 @@ Suggestions: "Send a suggestion" opens an email you can review and send. If you 
 
 Honesty labels: Working (it works), Estimate (a guide, check it), Needs you (you do this step), Coming later (not built yet).
 
-What is not built yet: official one-tap listing and take-down (starting with eBay), official eBay sold prices, a computer helper, buying shipping labels. Poshmark and Mercari rules do not allow unauthorized automation. Flip Helper will not ask for a selling-site password.
+What is not built yet: official one-tap listing and take-down (starting with eBay), official eBay sold prices, a computer helper, buying shipping labels. Poshmark and Mercari rules do not allow unauthorized automation. Jessica's Flip Side will not ask for a selling-site password.
 `.trim();
 
-export const ASK_SYSTEM = `You are a friendly helper inside Flip Helper, a simple iPhone app for resellers. Answer in short, plain words, as if the person is not used to computers. No jargon. Usually 2 to 5 short sentences. If they need to tap something, say the exact button or tab name. Do not invent features that are not in the guide. If something is Coming later, say so honestly. If you are not sure, say so.
+export const ASK_SYSTEM = `You are a friendly helper inside Jessica's Flip Side, a simple iPhone app for resellers. Answer in short, plain words, as if the person is not used to computers. No jargon. Usually 2 to 5 short sentences. If they need to tap something, say the exact button or tab name. Do not invent features that are not in the guide. If something is Coming later, say so honestly. If you are not sure, say so.
 
 If their message is really a request for a new feature or a change, set featureRequest to true and write a short suggestion they could send.
 

@@ -1,10 +1,20 @@
-/* Flip Helper — iPhone-first. Clean teal, safe areas, 44pt+ tap targets. */
+/* Jessica's Flip Side — iPhone-first. Clean teal, safe areas, 44pt+ tap targets. */
+
+@font-face{
+  font-family:"Dancing Script";
+  src:url("../fonts/DancingScript-Jessica.woff") format("woff"),
+      url("../fonts/DancingScript-Jessica.ttf") format("truetype");
+  font-weight:400 700;
+  font-style:normal;
+  font-display:swap;
+}
+
 :root{
   --a1:#0f766e;--a2:#2dd4bf;
   --bg:#f0f7f6;--card:#fff;--ink:#12312e;--muted:#5b736f;--line:#d7e6e3;--soft:#e6f3f1;--field:#fff;
   --ok:#15803d;--warn:#c2410c;--attn:#9a5b13;--attnbg:#fbf1e3;--bad:#dc2626;--r:20px;
   --shadow:0 6px 24px rgba(18,49,46,.08);
-  --tabh:64px;--headh:52px;--sat:env(safe-area-inset-top);--sab:env(safe-area-inset-bottom);
+  --tabh:64px;--headh:58px;--sat:env(safe-area-inset-top);--sab:env(safe-area-inset-bottom);
   color-scheme:light dark;
 }
 @media (prefers-color-scheme:dark){
@@ -31,7 +41,18 @@ p{margin:0 0 10px}
 
 /* header + suggestion */
 .apphead{position:fixed;top:0;left:0;right:0;z-index:20;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(var(--sat) + 6px) 12px 6px;min-height:calc(var(--sat) + var(--headh));background:color-mix(in srgb,var(--card) 88%,transparent);-webkit-backdrop-filter:saturate(180%) blur(18px);backdrop-filter:saturate(180%) blur(18px);border-bottom:1px solid var(--line)}
-.apphead-name{font-weight:800;font-size:1.12rem;letter-spacing:-.02em;flex:0 0 auto}
+
+/* header wordmark */
+.apphead-brand{display:flex;align-items:center;gap:8px;min-width:0;text-decoration:none;color:inherit;flex:0 1 auto}
+.apphead-brand:active{opacity:.8}
+.wordmark-mark{width:28px;height:28px;flex:0 0 28px;display:block}
+.wordmark{display:flex;flex-direction:column;line-height:1;min-width:0}
+.wordmark-script{font-family:"Dancing Script","Snell Roundhand","Segoe Script","Apple Chancery","Bradley Hand",cursive;font-weight:600;font-size:1.28rem;color:var(--a1);letter-spacing:-.01em;line-height:.95;margin:0}
+.wordmark-bold{font-weight:800;font-size:.92rem;letter-spacing:-.03em;color:var(--ink);line-height:1.05;margin-top:1px}
+.hero-brand{display:flex;align-items:baseline;flex-wrap:wrap;gap:.15em .45em;margin:0 0 8px;line-height:1}
+.hero-brand .wordmark-script{color:#fff;font-size:1.85rem;line-height:1}
+.hero-brand .wordmark-bold{color:#fff;font-size:1.05rem;letter-spacing:.01em;margin:0}
+
 .suggest-btn{appearance:none;border:0;border-radius:12px;background:color-mix(in srgb,var(--a1) 13%,var(--card));color:var(--a1);font-weight:700;font-size:.92rem;padding:10px 14px;min-height:44px;cursor:pointer;flex:0 1 auto;white-space:nowrap}
 .suggest-btn:active{transform:scale(.97)}
 
@@ -149,6 +170,7 @@ details.tweak>summary{cursor:pointer;min-height:48px;display:flex;align-items:ce
 @media (max-width:360px){
   .grid2{gap:8px}.topbar h2{font-size:1.1rem}.tabs a{font-size:.64rem}.btn{padding:12px 12px}
   .suggest-btn{font-size:.82rem;padding:10px 10px}.photo{width:84px;height:84px}
+  .wordmark-script{font-size:1.1rem}.wordmark-bold{font-size:.82rem}.wordmark-mark{width:24px;height:24px;flex-basis:24px}
 }
 #view #ai-error{margin-top:10px}
 

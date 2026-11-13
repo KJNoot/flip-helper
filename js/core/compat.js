@@ -136,7 +136,7 @@ export const COMPAT = [
     officialApi: false,
     automate: "No official listing API. Their terms have long restricted automated posting. Posting is also city-specific.",
     needsTap: "You open the post page and post yourself.",
-    unavailable: "A bot here is high risk. Flip Helper will not auto-post to Craigslist.",
+    unavailable: "A bot here is high risk. Jessica's Flip Side will not auto-post to Craigslist.",
     path: "forbidden",
     pathLabel: "Automated posting not allowed",
     sources: [
@@ -188,7 +188,7 @@ export const COMPAT = [
     officialApi: false,
     automate: "Different model: you send a bag, they list the items. Not a usual copy-and-post listing.",
     needsTap: "A link to their clean-out sign-up is enough.",
-    unavailable: "Flip Helper cannot post to thredUP the usual way.",
+    unavailable: "Jessica's Flip Side cannot post to thredUP the usual way.",
     path: "other",
     pathLabel: "Consignment — not a usual listing",
     sources: [

@@ -104,7 +104,7 @@ export function renderTaxes(ctx, el, year) {
     print: () => {
       document.documentElement.dataset.print = "taxes";
       const prev = document.title;
-      document.title = `Flip Helper — ${y} summary`;
+      document.title = `Jessica's Flip Side — ${y} summary`;
       // A print-only block is already in the page; add a simple text preview sheet? Just print.
       window.print();
       document.title = prev;

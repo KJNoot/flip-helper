@@ -6,7 +6,7 @@ import { FEATURE_GUIDE, ASK_SYSTEM } from "./guide.js";
 
 export const ASK_MODEL = AI_MODEL; // gpt-4o-mini
 export const ASK_NO_KEY = "To ask a question, paste the AI key in Settings first. It stays on this phone only.";
-export const ASK_WELCOME = "Ask how to do something in Flip Helper, or a selling question. I'll give a short, plain answer, and I'll tell you which button to tap.";
+export const ASK_WELCOME = "Ask how to do something in Jessica's Flip Side, or a selling question. I'll give a short, plain answer, and I'll tell you which button to tap.";
 
 export function normalizeAsk(raw = {}) {
   const answer = String(raw.answer || raw.text || raw.reply || "").trim();
