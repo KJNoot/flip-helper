@@ -10,7 +10,7 @@ import { autoLevels, cleanupDataUrl, PHOTO_CLEANUP_NOTE } from "./photo.js";
 import { chatJson, AI_MODEL } from "./draft.js";
 
 export const STUDIO_LABEL = "studio";
-export const STUDIO_NOTE = "A studio photo on this phone: the background comes off here, not through a paid service. It does not hide damage, and it does not blur or smooth the photo. Check that flaws are still visible.";
+export const STUDIO_NOTE = "Cleans up the photo on this phone, like a phone's auto-enhance: light, color, and focus, and keeps the real background. A white studio cutout is still a choice on this sheet. It does not hide damage. Check that flaws are still visible.";
 export const STUDIO_PROGRESS_FIRST = "Getting the studio ready… first time takes a moment";
 export const STUDIO_PROGRESS_WORKING = "Making a studio photo…";
 export const STUDIO_FALLBACK_MSG = "The studio tools couldn’t start on this phone, so we used the basic clean-up instead. Your original is still here.";
@@ -35,7 +35,8 @@ export const STUDIO_MODEL = {
 };
 
 export const BACKGROUNDS = {
-  white: { id: "white", label: "Pure white", rgb: [255, 255, 255], note: "Marketplace standard" },
+  enhance: { id: "enhance", label: "Enhance", rgb: null, note: "Keeps your background. Cleans up light, color, and focus, like a phone's auto-enhance." },
+  white: { id: "white", label: "White studio", rgb: [255, 255, 255], note: "Marketplace standard — the background comes off on this phone." },
   gray: {
     id: "gray",
     label: "Soft gray",
@@ -47,6 +48,7 @@ export const BACKGROUNDS = {
 };
 
 export const EXPORT_FRAMES = {
+  photo: { id: "photo", label: "As taken", ratio: "original", w: 0, h: 0, note: "Keeps the photo's shape" },
   square: { id: "square", label: "Square", ratio: "1:1", w: 1, h: 1, note: "Most sites, including eBay and Mercari" },
   portrait: { id: "portrait", label: "Tall", ratio: "4:5", w: 4, h: 5, note: "Poshmark and Depop-style feeds" }
 };
@@ -115,8 +117,19 @@ function asMask(mask, length) {
 }
 
 /** Destination pixel size for a marketplace frame. Long edge is `edge`. */
-export function frameSize(aspect = "square", edge = STUDIO_EXPORT_EDGE) {
+export function frameSize(aspect = "square", edge = STUDIO_EXPORT_EDGE, srcW, srcH) {
   const frame = EXPORT_FRAMES[aspect] || EXPORT_FRAMES.square;
+  if (frame.id === "photo") {
+    const w = srcW || edge, h = srcH || edge;
+    const long = Math.max(w, h) || 1;
+    const cap = Math.min(long, edge);
+    const scale = cap / long;
+    return {
+      width: Math.max(1, Math.round(w * scale)),
+      height: Math.max(1, Math.round(h * scale)),
+      aspect: "photo"
+    };
+  }
   if (frame.w === frame.h) return { width: edge, height: edge, aspect: frame.id };
   // Portrait 4:5: tall side is the long edge.
   const height = edge;
@@ -1265,7 +1278,7 @@ export function renderStudio(src, {
   }
 
   const keepOriginal = background === "original";
-  const frame = frameSize(aspect, edge);
+  const frame = frameSize(aspect, edge, width, height);
   let framed;
   if (center) {
     const bounds = foregroundBounds(mask, width, height);
@@ -1374,7 +1387,10 @@ export async function studioOrBasic(pixels, options = {}, {
     if (mw !== pixels.width || mh !== pixels.height) {
       mask = upsampleMask(mask, mw, mh, pixels.width, pixels.height);
     }
-    const result = renderStudio({ ...src, mask }, options);
+    const look = options.look || options.background;
+    const result = (look === "enhance" && typeof options.enhance === "function")
+      ? options.enhance({ ...src, mask }, options)
+      : renderStudio({ ...src, mask }, options);
     return {
       ok: true,
       fallback: false,
@@ -1382,11 +1398,20 @@ export async function studioOrBasic(pixels, options = {}, {
       ...result
     };
   } catch (err) {
+    const look = options.look || options.background;
+    if (look === "enhance" && typeof options.enhance === "function") {
+      try {
+        const result = options.enhance({
+          data: pixels.data, width: pixels.width, height: pixels.height, mask: null
+        }, options);
+        return { ok: true, fallback: false, enhanceWithoutMask: true, ...result };
+      } catch (_) { /* fall through to basic */ }
+    }
     onProgress?.({ phase: "fallback", message: STUDIO_FALLBACK_MSG });
     let basic = null;
     if (typeof cleanup === "function" && dataUrl) {
       try {
-        const white = options.background !== "original";
+        const white = options.background !== "original" && options.background !== "enhance";
         basic = await cleanup(dataUrl, { brighten: true, square: true, whiteBackground: white });
       } catch (_) { /* ignore cleanup failure */ }
     }

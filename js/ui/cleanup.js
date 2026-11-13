@@ -8,6 +8,7 @@ import {
   BACKGROUNDS, EXPORT_FRAMES, COVER_CHECK_NOTE, COVER_CHECK_LABEL,
   nextMattePreset, requestCoverCheck
 } from "../core/studio.js";
+import { ENHANCE_LOOK, ENHANCE_LABEL, ENHANCE_NOTE, ENHANCE_BLUR_LABEL, ENHANCE_CROP_LABEL, ENHANCE_PROGRESS, isEnhanceOptions } from "../core/enhance.js";
 import { makeStudioPhoto, renderStudioJpeg } from "../core/segment.js";
 import { hasKey, getKey } from "../core/key.js";
 
@@ -23,7 +24,7 @@ function photoList({ photos, dataUrl } = {}) {
 }
 
 function defaultOptions() {
-  return { background: "white", shadow: true, straighten: true, center: true, aspect: "square", matte: "default" };
+  return { look: "enhance", background: "enhance", shadow: false, straighten: true, center: true, crop: true, blurBg: true, aspect: "photo", matte: "default" };
 }
 
 export function openCleanup({ dataUrl, photos, index = 0, onApply, onApplyAll } = {}) {
@@ -49,7 +50,8 @@ export function openCleanup({ dataUrl, photos, index = 0, onApply, onApplyAll } 
     const after = (mode === "basic" ? basicUrl : (cached && cached.dataUrl)) || "";
     const before = originalOf(idx);
     const tall = opts.aspect === "portrait";
-    const shadowOff = opts.background === "original";
+    const isEnhance = isEnhanceOptions(opts);
+    const shadowOff = isEnhance || opts.background === "original";
     const progress = lastMsg ? `<p class="tiny" id="studio-progress">${esc(lastMsg)}</p>` : `<p class="tiny" id="studio-progress"></p>`;
     const thumbs = n > 1 ? `<div class="studio-thumbs" role="list">${list.map((p, i) =>
       `<button type="button" class="studio-thumb${i === idx ? " on" : ""}" data-r="thumb" data-i="${i}" aria-label="Photo ${i + 1}"${i === idx ? " aria-current=\"true\"" : ""}>
@@ -67,17 +69,27 @@ export function openCleanup({ dataUrl, photos, index = 0, onApply, onApplyAll } 
         </div>
         <div class="ba-handle" aria-hidden="true"></div>
         <span class="ba-tag ba-tag-before">Original</span>
-        <span class="ba-tag ba-tag-after">${mode === "basic" ? "Basic" : "Studio"}</span>
+        <span class="ba-tag ba-tag-after">${mode === "basic" ? "Basic" : (isEnhanceOptions(opts) ? "Enhance" : "Studio")}</span>
         <input type="range" class="ba-range" id="studio-ba-range" min="0" max="100" value="50" aria-label="Slide between the original and the new photo">
       </div>
       ${thumbs}
-      <p class="tiny muted" style="margin:10px 0 4px">Background</p>
+      <p class="tiny muted" style="margin:10px 0 4px">Look</p>
       <div class="seg studio-bg-seg" id="studio-bg">
-        ${Object.values(BACKGROUNDS).map(b =>
-          `<button type="button" class="${opts.background === b.id ? "on" : ""}" data-r="bg" data-bg="${b.id}">${esc(b.label)}</button>`
-        ).join("")}
+        ${["enhance", "white", "gray"].map(id => {
+          const b = BACKGROUNDS[id];
+          const on = (opts.look || opts.background) === id;
+          return `<button type="button" class="${on ? "on" : ""}" data-r="bg" data-bg="${b.id}">${esc(b.label)}</button>`;
+        }).join("")}
       </div>
-      <p class="tiny muted" id="studio-bg-note">${esc((BACKGROUNDS[opts.background] || BACKGROUNDS.white).note)}</p>
+      <p class="tiny muted" id="studio-bg-note">${esc((BACKGROUNDS[opts.look || opts.background] || BACKGROUNDS.enhance).note)}</p>
+      ${isEnhance ? `<label class="check" id="studio-blur-wrap">
+        <input type="checkbox" id="studio-blur"${opts.blurBg !== false ? " checked" : ""}>
+        <span>${esc(ENHANCE_BLUR_LABEL)}</span>
+      </label>
+      <label class="check" id="studio-crop-wrap">
+        <input type="checkbox" id="studio-crop"${opts.crop !== false ? " checked" : ""}>
+        <span>${esc(ENHANCE_CROP_LABEL)}</span>
+      </label>` : ""}
       <label class="check" id="studio-shadow-wrap"${shadowOff ? " style=\"display:none\"" : ""}>
         <input type="checkbox" id="studio-shadow"${opts.shadow ? " checked" : ""}>
         <span>Soft drop shadow</span>
@@ -122,6 +134,16 @@ export function openCleanup({ dataUrl, photos, index = 0, onApply, onApplyAll } 
     const sh = $("#studio-shadow", bg);
     if (sh) sh.addEventListener("change", async () => {
       opts.shadow = sh.checked;
+      await rerender();
+    });
+    const bl = $("#studio-blur", bg);
+    if (bl) bl.addEventListener("change", async () => {
+      opts.blurBg = bl.checked;
+      await rerender();
+    });
+    const cr = $("#studio-crop", bg);
+    if (cr) cr.addEventListener("change", async () => {
+      opts.crop = cr.checked;
       await rerender();
     });
     const panel = $("#studio-basic-panel", bg);
@@ -195,11 +217,13 @@ export function openCleanup({ dataUrl, photos, index = 0, onApply, onApplyAll } 
         if (result.dataUrl && $("#studio-after", bg)) $("#studio-after", bg).src = result.dataUrl;
       } else {
         cache[idx] = { ...result, optionKey: key };
-        setProgress("Studio photo ready. The original is kept. Check that flaws are still visible.");
+        setProgress(isEnhanceOptions(opts)
+          ? "Enhanced photo ready. The original is kept. Check that flaws are still visible."
+          : "Studio photo ready. The original is kept. Check that flaws are still visible.");
         const after = $("#studio-after", bg);
         if (after) after.src = result.dataUrl;
         const tag = bg.querySelector(".ba-tag-after");
-        if (tag) tag.textContent = "Studio";
+        if (tag) tag.textContent = isEnhanceOptions(opts) ? "Enhance" : "Studio";
         const before = $("#studio-before", bg);
         if (before) before.src = originalOf(idx);
       }
@@ -223,10 +247,10 @@ export function openCleanup({ dataUrl, photos, index = 0, onApply, onApplyAll } 
         const ba = $("#studio-ba", bg);
         if (ba) ba.classList.toggle("is-tall", opts.aspect === "portrait");
         const wrap = $("#studio-shadow-wrap", bg);
-        if (wrap) wrap.style.display = opts.background === "original" ? "none" : "";
+        if (wrap) wrap.style.display = (isEnhanceOptions(opts) || opts.background === "original") ? "none" : "";
         mode = "studio";
         const tag = bg.querySelector(".ba-tag-after");
-        if (tag) tag.textContent = "Studio";
+        if (tag) tag.textContent = isEnhanceOptions(opts) ? "Enhance" : "Studio";
         return;
       } catch (_) { /* fall through to a full run */ }
     }
@@ -252,8 +276,9 @@ export function openCleanup({ dataUrl, photos, index = 0, onApply, onApplyAll } 
     }
     if (r === "bg") {
       opts.background = b.dataset.bg;
-      if (opts.background === "original") opts.shadow = false;
-      else if (!$("#studio-shadow", bg) || $("#studio-shadow", bg).checked) opts.shadow = true;
+      opts.look = b.dataset.bg;
+      if (isEnhanceOptions(opts)) opts.shadow = false;
+      else opts.shadow = true;
       paint();
       await rerender();
       return;
