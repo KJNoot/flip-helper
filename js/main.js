@@ -43,7 +43,18 @@ const ctx = {
     queueSync();
     return row;
   },
-  async remove(id) { await store.remove(id); await ctx.reload(); updateChrome(); queueSync(); },
+  async remove(id) {
+    // A delete must be a tombstone, or the next sync would pull the item
+    // back from the other device ("nothing is wiped" without a tombstone).
+    try {
+      const { noteLocalChange } = await import("./core/sync.js");
+      await noteLocalChange({ kind: "item", id, action: "delete", auto: false });
+    } catch (e) { /* still remove locally */ }
+    await store.remove(id);
+    await ctx.reload();
+    updateChrome();
+    queueSync();
+  },
   async reload() {
     ctx.items = await store.all();
     return ctx.items;
