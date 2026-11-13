@@ -8,8 +8,12 @@ import { renderAdd } from "./ui/screens/add.js";
 import { renderItem } from "./ui/screens/item.js";
 import { renderItems } from "./ui/screens/items.js";
 import { renderSettings } from "./ui/screens/settings.js";
+import { renderScan } from "./ui/screens/scan.js";
+import { renderTaxes } from "./ui/screens/taxes.js";
+import { badgeCount, attentionItems, shouldRemind, reminderBody, delistCountdown } from "./core/protect.js";
+import { getSettings, setReminder, getReminders } from "./core/settings.js";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 const view = $("#view");
 const store = await createStore();
@@ -19,17 +23,24 @@ const ctx = {
   store,
   items: [],
   work: null,
+  scanWork: null,
   screen: "Home",
   go(hash) { location.hash = hash; },
   async save(item) {
     const row = await store.put(normalizeItem(item));
     await ctx.reload();
+    updateChrome();
     return row;
   },
-  async remove(id) { await store.remove(id); await ctx.reload(); },
+  async remove(id) { await store.remove(id); await ctx.reload(); updateChrome(); },
   async reload() {
     ctx.items = await store.all();
     return ctx.items;
+  },
+  onSold(item) {
+    // Immediate loud reminder at the moment of sale.
+    maybeNotify(item, { force: true });
+    updateChrome();
   },
   render
 };
@@ -47,12 +58,14 @@ const SCREEN_NAMES = {
   add: "Add an item",
   items: "Items",
   item: "Item",
-  settings: "Settings"
+  settings: "Settings",
+  scan: "Buy or pass",
+  taxes: "Taxes"
 };
 
 function render() {
   const { head, rest } = parseHash();
-  const tab = head === "item" ? "items" : (head || "home");
+  const tab = head === "item" ? "items" : (head === "taxes" ? "home" : (head || "home"));
   document.querySelectorAll(".tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === tab));
   ctx.screen = SCREEN_NAMES[head] || head;
   if (head === "item" && rest[0]) {
@@ -65,14 +78,65 @@ function render() {
     renderItems(ctx, view, rest[0] || "all");
   } else if (head === "settings") {
     renderSettings(ctx, view);
+  } else if (head === "scan") {
+    renderScan(ctx, view);
+  } else if (head === "taxes") {
+    renderTaxes(ctx, view, rest[0]);
   } else {
     ctx.screen = "Home";
     renderHome(ctx, view);
   }
   document.documentElement.dataset.ready = "1";
   document.documentElement.dataset.screen = head || "home";
+  updateChrome();
   window.scrollTo(0, 0);
 }
+
+function updateChrome() {
+  const n = badgeCount(ctx.items);
+  const badge = document.getElementById("items-badge");
+  if (badge) {
+    if (n > 0) { badge.hidden = false; badge.textContent = String(n); }
+    else { badge.hidden = true; badge.textContent = ""; }
+  }
+  const base = "Flip Helper";
+  document.title = n > 0 ? `(${n}) ${base}` : base;
+}
+
+function maybeNotify(item, { force = false } = {}) {
+  const last = (getReminders()[item.id] || {}).lastAt;
+  if (!force && !shouldRemind(item, last, Date.now())) return false;
+  const msg = reminderBody(item);
+  if (!msg) return false;
+  setReminder(item.id, Date.now());
+  // In-app toast is a reminder she can always see while the app is open.
+  // Tests can set __flipQuiet to keep screenshots clean.
+  if (!window.__flipQuiet) toast(msg.body);
+  const prefs = getSettings();
+  if (prefs.notifyDelist && typeof Notification !== "undefined" && Notification.permission === "granted") {
+    try {
+      const note = new Notification(msg.title, { body: msg.body, tag: msg.tag, silent: false });
+      note.onclick = () => { try { window.focus(); } catch (e) {} location.hash = "#/item/" + item.id; try { note.close(); } catch (e) {} };
+    } catch (e) { /* some browsers require a service worker for notifications */ }
+  }
+  return true;
+}
+
+function tickReminders() {
+  updateChrome();
+  const items = attentionItems(ctx.items);
+  if (!items.length) return;
+  const reminders = getReminders();
+  for (const item of items) {
+    maybeNotify(item, { force: false });
+    // Touch lastAt read — maybeNotify already schedules.
+    void reminders;
+    void delistCountdown; // countdown is rendered on the item page
+  }
+}
+
+let remindTimer = setInterval(tickReminders, 15000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) tickReminders(); });
 
 window.addEventListener("hashchange", render);
 $("#suggest-open").addEventListener("click", () => openSuggest({ version: VERSION, screen: ctx.screen }));
@@ -81,6 +145,7 @@ const swOK = "serviceWorker" in navigator && !/[?&]nosw\b/.test(location.search)
 if (swOK) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 
 render();
+tickReminders();
 
 // Exposed for smoke tests only. Not a public API. Never includes the AI key.
 window.__flip = {
@@ -91,5 +156,8 @@ window.__flip = {
   save: item => ctx.save(item),
   remove: id => ctx.remove(id),
   go: h => ctx.go(h),
-  render
+  render,
+  tickReminders,
+  get scanWork() { return ctx.scanWork; },
+  setScan(w) { ctx.scanWork = w; }
 };

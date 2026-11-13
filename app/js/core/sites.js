@@ -8,8 +8,10 @@ export const SITES = [
     group: "marketplaces",
     sellUrl: "https://www.ebay.com/sl/prelist/suggest",
     manageUrl: "https://www.ebay.com/sh/lst/active",
+    soldKind: "sold-completed",
     soldSearch: q => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}&LH_Complete=1&LH_Sold=1`,
-    activeSearch: q => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}`
+    activeSearch: q => `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(q)}`,
+    labelUrl: "https://www.ebay.com/ship/usd"
   },
   {
     id: "facebook",
@@ -18,6 +20,7 @@ export const SITES = [
     group: "marketplaces",
     sellUrl: "https://www.facebook.com/marketplace/create/item",
     manageUrl: "https://www.facebook.com/marketplace/you/selling",
+    soldKind: "search",
     soldSearch: q => `https://www.facebook.com/marketplace/search/?query=${encodeURIComponent(q)}`,
     activeSearch: q => `https://www.facebook.com/marketplace/search/?query=${encodeURIComponent(q)}`
   },
@@ -27,8 +30,10 @@ export const SITES = [
     group: "marketplaces",
     sellUrl: "https://www.mercari.com/sell/",
     manageUrl: "https://www.mercari.com/mypage/listings/active/",
+    soldKind: "search",
     soldSearch: q => `https://www.mercari.com/search/?keyword=${encodeURIComponent(q)}`,
-    activeSearch: q => `https://www.mercari.com/search/?keyword=${encodeURIComponent(q)}`
+    activeSearch: q => `https://www.mercari.com/search/?keyword=${encodeURIComponent(q)}`,
+    labelUrl: "https://www.mercari.com/mypage/"
   },
   {
     id: "offerup",
@@ -36,6 +41,7 @@ export const SITES = [
     group: "marketplaces",
     sellUrl: "https://offerup.com/post/",
     manageUrl: "https://offerup.com/dashboard/selling/",
+    soldKind: "search",
     soldSearch: q => `https://offerup.com/search/?q=${encodeURIComponent(q)}`,
     activeSearch: q => `https://offerup.com/search/?q=${encodeURIComponent(q)}`
   },
@@ -46,6 +52,7 @@ export const SITES = [
     note: "Local listings. You'll pick your city on their site.",
     sellUrl: "https://post.craigslist.org/",
     manageUrl: "https://accounts.craigslist.org/",
+    soldKind: "search",
     soldSearch: q => `https://www.craigslist.org/search/sss?query=${encodeURIComponent(q)}`,
     activeSearch: q => `https://www.craigslist.org/search/sss?query=${encodeURIComponent(q)}`
   },
@@ -55,8 +62,10 @@ export const SITES = [
     group: "fashion",
     sellUrl: "https://poshmark.com/create-listing",
     manageUrl: "https://poshmark.com/feed",
+    soldKind: "sold-out",
     soldSearch: q => `https://poshmark.com/search?query=${encodeURIComponent(q)}&type=listings&availability=sold_out`,
-    activeSearch: q => `https://poshmark.com/search?query=${encodeURIComponent(q)}`
+    activeSearch: q => `https://poshmark.com/search?query=${encodeURIComponent(q)}`,
+    labelUrl: "https://poshmark.com/order/sales"
   },
   {
     id: "depop",
@@ -64,8 +73,10 @@ export const SITES = [
     group: "fashion",
     sellUrl: "https://www.depop.com/products/create/",
     manageUrl: "https://www.depop.com/sellinghub/",
+    soldKind: "search",
     soldSearch: q => `https://www.depop.com/search/?q=${encodeURIComponent(q)}`,
-    activeSearch: q => `https://www.depop.com/search/?q=${encodeURIComponent(q)}`
+    activeSearch: q => `https://www.depop.com/search/?q=${encodeURIComponent(q)}`,
+    labelUrl: "https://www.depop.com/sellinghub/"
   },
   {
     id: "vinted",
@@ -73,6 +84,7 @@ export const SITES = [
     group: "fashion",
     sellUrl: "https://www.vinted.com/items/new",
     manageUrl: "https://www.vinted.com/inbox",
+    soldKind: "search",
     soldSearch: q => `https://www.vinted.com/catalog?search_text=${encodeURIComponent(q)}`,
     activeSearch: q => `https://www.vinted.com/catalog?search_text=${encodeURIComponent(q)}`
   },
@@ -83,6 +95,7 @@ export const SITES = [
     note: "Mostly menswear and streetwear.",
     sellUrl: "https://www.grailed.com/sell",
     manageUrl: "https://www.grailed.com/shop",
+    soldKind: "search",
     soldSearch: q => `https://www.grailed.com/shop?query=${encodeURIComponent(q)}`,
     activeSearch: q => `https://www.grailed.com/shop?query=${encodeURIComponent(q)}`
   },
@@ -93,8 +106,10 @@ export const SITES = [
     note: "Handmade, vintage, and craft supplies.",
     sellUrl: "https://www.etsy.com/your/shops/me/listing-editor/create",
     manageUrl: "https://www.etsy.com/your/shops/me/tools/listings",
+    soldKind: "search",
     soldSearch: q => `https://www.etsy.com/search?q=${encodeURIComponent(q)}`,
-    activeSearch: q => `https://www.etsy.com/search?q=${encodeURIComponent(q)}`
+    activeSearch: q => `https://www.etsy.com/search?q=${encodeURIComponent(q)}`,
+    labelUrl: "https://www.etsy.com/your/orders/sold"
   },
   {
     id: "shopify",
@@ -103,6 +118,7 @@ export const SITES = [
     note: "Your own shop, if you have one.",
     sellUrl: "https://admin.shopify.com/",
     manageUrl: "https://admin.shopify.com/",
+    soldKind: "search",
     soldSearch: q => `https://admin.shopify.com/`,
     activeSearch: q => `https://admin.shopify.com/`
   },
@@ -113,6 +129,7 @@ export const SITES = [
     note: "Live selling, often from their app.",
     sellUrl: "https://www.whatnot.com/",
     manageUrl: "https://www.whatnot.com/",
+    soldKind: "search",
     soldSearch: q => `https://www.whatnot.com/search?q=${encodeURIComponent(q)}`,
     activeSearch: q => `https://www.whatnot.com/search?q=${encodeURIComponent(q)}`
   },
@@ -123,6 +140,7 @@ export const SITES = [
     note: "Kids' and baby clothes and gear.",
     sellUrl: "https://www.kidizen.com/listings/new",
     manageUrl: "https://www.kidizen.com/myshop",
+    soldKind: "search",
     soldSearch: q => `https://www.kidizen.com/shop?search_term=${encodeURIComponent(q)}`,
     activeSearch: q => `https://www.kidizen.com/shop?search_term=${encodeURIComponent(q)}`
   },
@@ -133,6 +151,7 @@ export const SITES = [
     note: "Consignment: you send a bag of items, they list them. Not a usual copy-and-post listing.",
     sellUrl: "https://www.thredup.com/cleanout",
     manageUrl: "https://www.thredup.com/cleanout",
+    soldKind: "search",
     soldSearch: q => `https://www.thredup.com/products?text=${encodeURIComponent(q)}`,
     activeSearch: q => `https://www.thredup.com/products?text=${encodeURIComponent(q)}`
   }

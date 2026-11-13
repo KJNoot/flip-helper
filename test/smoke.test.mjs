@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import assert from "node:assert/strict";
 import { serve } from "../tools/serve.mjs";
 import { emptyItem, setListed, markSold } from "../app/js/core/inventory.js";
+import { scanResult } from "../app/js/core/scanner.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const OUT = join(HERE, "out") + "/";
@@ -41,8 +42,11 @@ page.on("console", m => { if (m.type() === "error") errors.push("console: " + m.
 let n = 0;
 const shot = async (name, { keepFx = false, also } = {}) => {
   await page.waitForTimeout(200);
-  if (!keepFx) await page.evaluate(() => { document.querySelector("#toast")?.classList.remove("show"); });
-  await page.waitForTimeout(keepFx ? 0 : 280);
+  if (!keepFx) await page.evaluate(() => {
+    const t = document.querySelector("#toast");
+    if (t) { t.classList.remove("show"); t.textContent = ""; }
+  });
+  await page.waitForTimeout(keepFx ? 0 : 350);
   const file = `${OUT}${String(++n).padStart(2, "0")}-${name}.png`;
   await page.screenshot({ path: file, fullPage: false });
   if (also) {
@@ -68,6 +72,7 @@ const now = Date.now();
 try {
   await page.goto(base);
   await page.waitForSelector("html[data-ready='1']");
+  await page.evaluate(() => { window.__flipQuiet = true; });
 
   await step("home: empty, suggestion, honesty, totals at zero", async () => {
     assert.equal(await page.title(), "Flip Helper");
@@ -76,6 +81,8 @@ try {
     assert.match(await text(), /No items yet/);
     assert.match(await text(), /Needs you to post/);
     assert.match(await text(), /Coming later/);
+    assert.ok(await page.isVisible('[data-cta="scan"], a[href="#/scan"]'), "Buy or pass is on Home");
+    assert.match(await text(), /Taxes|taxes/);
     const stats = await page.$$eval(".stats .card.stat b", bs => bs.map(b => b.textContent.trim()));
     assert.equal(stats[0], "0");
     assert.equal(stats[1], "0");
@@ -102,7 +109,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Flip Helper v0\.1\.0/);
+    assert.match(await text(), /Flip Helper v0\.2\.0/);
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);
@@ -111,6 +118,13 @@ try {
     }
     // default six are ticked
     assert.equal(await page.locator('#sitescard input[data-act="togglesite"]:checked').count(), 6);
+    assert.match(await text(), /Price-drop ideas/);
+    assert.match(await text(), /Mileage rate/);
+    assert.match(await text(), /Official eBay sold prices/);
+    assert.match(await text(), /Needs eBay developer account/);
+    assert.match(await text(), /Coming later/);
+    assert.match(await text(), /Take-down reminders/);
+    assert.ok(await page.isVisible("#dropdays"));
     await page.locator("#sitescard").scrollIntoViewIfNeeded();
     await shot("settings-sites", { also: "04-settings.png" });
   });
@@ -198,12 +212,15 @@ try {
     assert.equal(stats[1], "1", "one sold this month");
     assert.match(stats[2], /\$14\.40/);
     assert.ok(await page.isVisible("#delist-alerts"));
+    assert.match(await text(), /don't let them sell twice|Take these down/);
+    const badge = await page.textContent("#items-badge");
+    assert.ok(badge && Number(badge) >= 1, "Items tab shows a take-down badge");
     await shot("home", { also: "01-home.png" });
   });
 
   await step("item: delist checklist, checking off clears the highlight", async () => {
     await go("#/item/it_mug_demo");
-    assert.match(await text(), /Take it down on these sites/);
+    assert.match(await text(), /Take it down/);
     assert.match(await text(), /not automatic/);
     assert.ok(await page.isVisible('#delist [data-site="poshmark"]'));
     assert.ok(await page.isVisible('#delist [data-site="mercari"]'));
@@ -211,7 +228,21 @@ try {
     assert.ok(await page.isVisible('#delist a[href*="poshmark"]'));
     assert.match(await text(), /Profit/);
     assert.match(await text(), /\$14\.40/);
+    assert.ok(await page.isVisible("#countdown-clock"));
+    assert.match(await text(), /don't let it sell twice|Take it down now|Still listed/);
     await shot("item-delist", { also: "03-item-delist.png" });
+    await page.locator("#delist").scrollIntoViewIfNeeded();
+    await shot("item-delist-loud", { also: "v2-delist.png" });
+    await page.locator("#comps").scrollIntoViewIfNeeded();
+    assert.match(await text(), /Sold price check/);
+    assert.match(await text(), /eBay sold/);
+    assert.ok(await page.isVisible('[data-act="logcomp"]'));
+    await shot("sold-prices", { also: "v2-sold-prices.png" });
+    await page.locator("#shipsuggest").scrollIntoViewIfNeeded();
+    assert.match(await text(), /One-tap shipping/);
+    assert.match(await text(), /USPS Ground Advantage/);
+    assert.match(await text(), /Coming later/);
+    await shot("shipping", { also: "v2-shipping.png" });
     await page.check('#delist [data-act="delist"][data-site="poshmark"]');
     await page.waitForTimeout(250);
     await page.check('#delist [data-act="delist"][data-site="mercari"]');
@@ -248,8 +279,116 @@ try {
     await page.waitForTimeout(400);
     assert.match(await text(), /Sold/);
     // listed on ebay and poshmark, sold on ebay -> poshmark is a delist target
-    assert.match(await text(), /Take it down on these sites/);
+    assert.match(await text(), /Take it down/);
     assert.ok(await page.isVisible('#delist [data-site="poshmark"]'));
+  });
+
+  await step("scan: buy-or-pass screen with a seeded check and a verdict", async () => {
+    const draft = {
+      title: "Lakeview Pottery blue ceramic mug",
+      description: "A handmade blue mug.",
+      category: "Kitchen",
+      condition: "Like new",
+      brand: "Lakeview Pottery",
+      priceLow: 20,
+      priceHigh: 32,
+      priceReason: "A rough estimate from the photo, not from checking sold listings.",
+      daysToSell: "medium",
+      speedReason: "Mugs like this often sell in a few weeks.",
+      notes: "",
+      ship: { boxLabel: "Small sturdy box", lengthIn: 8, widthIn: 8, heightIn: 8, weightOz: 24, weightLb: 1.5, reason: "Ceramics need a box and padding.", source: "heuristic", approx: true }
+    };
+    const result = scanResult({
+      asking: 6,
+      resaleLow: 20,
+      resaleHigh: 32,
+      siteIds: ["ebay", "poshmark", "mercari", "facebook", "etsy", "depop"],
+      weightOz: 24
+    });
+    await go("#/scan");
+    assert.ok(await page.isVisible("#suggest-open"));
+    assert.match(await text(), /Buy or pass/);
+    assert.equal(await page.locator("#cam").count(), 1);
+    await page.evaluate(({ mug, draft, result }) => {
+      window.__flip.setScan({
+        photos: [{ dataUrl: mug, addedAt: Date.now() }],
+        asking: "6",
+        notes: "",
+        busy: false,
+        error: "",
+        draft,
+        result
+      });
+      window.__flip.render();
+    }, { mug, draft, result });
+    await page.waitForTimeout(300);
+    assert.match(await text(), /Lakeview Pottery/);
+    assert.match(await text(), /Buy|Maybe|Pass/);
+    assert.match(await text(), /Likely profit/);
+    assert.match(await text(), /Approximate|Estimate/);
+    const verd = page.locator("#verdict, #verdict-live");
+    if (await verd.count()) await verd.first().scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+    await shot("scan", { also: "v2-scan.png" });
+  });
+
+  await step("price-drop idea appears for a listing that has sat", async () => {
+    const listedAt = Date.now() - 20 * 24 * 60 * 60 * 1000;
+    await page.evaluate(({ mug, listedAt }) => {
+      return window.__flip.save({
+        id: "it_stale_jacket",
+        createdAt: listedAt,
+        updatedAt: listedAt,
+        title: "Navy wool jacket",
+        description: "A navy wool jacket, good condition.",
+        category: "Women's coats",
+        condition: "Good",
+        askingPrice: 40,
+        priceLow: 24,
+        priceHigh: 48,
+        costPaid: 12,
+        photos: [{ dataUrl: mug, addedAt: listedAt }],
+        listedOn: { ebay: { at: listedAt }, poshmark: { at: listedAt } }
+      });
+    }, { mug, listedAt });
+    await page.evaluate(() => window.__flip.reload());
+    await page.waitForTimeout(300);
+    await go("#/home");
+    assert.match(await text(), /Price-drop ideas/);
+    assert.match(await text(), /Navy wool jacket/);
+    await go("#/item/it_stale_jacket");
+    assert.match(await text(), /Price-drop ideas|Drop the price/);
+    assert.ok(await page.isVisible('[data-act="approvedrop"]'));
+    await page.locator("#drops").scrollIntoViewIfNeeded();
+    await shot("drops", { also: "v2-drops.png" });
+  });
+
+  await step("taxes year view, mileage log, and CSV, labeled not tax advice", async () => {
+    await go("#/taxes");
+    assert.ok(await page.isVisible("#suggest-open"));
+    assert.match(await text(), /Not tax advice/i);
+    assert.match(await text(), /Income/);
+    assert.match(await text(), /Mileage/);
+    assert.match(await text(), /IRS/);
+    await page.click('[data-act="addtrip"]');
+    await page.waitForSelector("#prompt-title");
+    await page.fill("#miles", "12");
+    await page.fill("#purpose", "Post office");
+    await page.locator('.sheet-bg .sheet [data-r="1"]').click({ force: true });
+    await page.waitForTimeout(400);
+    assert.match(await text(), /Post office/);
+    assert.match(await text(), /12/);
+    await shot("taxes", { also: "v2-taxes.png" });
+    const [download] = await Promise.all([
+      page.waitForEvent("download", { timeout: 8000 }),
+      page.click('[data-act="csv"]')
+    ]);
+    const dest = OUT + "taxes.csv";
+    await download.saveAs(dest);
+    const csv = readFileSync(dest, "utf8");
+    assert.match(csv, /Not tax advice/);
+    assert.doesNotMatch(csv, /sk-/);
+    assert.match(csv, /Post office/);
   });
 
   await step("export backup has items and no key, then wipe restores empty home", async () => {

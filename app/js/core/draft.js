@@ -202,6 +202,136 @@ export async function requestDraft({ photos, notes, costPaid, key, enabledSites,
   return { draft, usage: payload.usage || null, model: payload.model || model };
 }
 
+
+const SCAN_SYSTEM = `You help someone at a thrift store or garage sale decide whether to buy an item to resell.
+Look at the photo(s) and any notes. Reply with a single JSON object only, no markdown, with these keys:
+- title: a clear name for the item (under 80 characters)
+- category, condition, brand ("" if you cannot reasonably tell)
+- priceLow, priceHigh: expected resale asking prices in US dollars if listed in good, honest condition
+- priceReason: one or two short sentences. Say clearly this is a rough estimate from the photo, not from checking sold listings.
+- daysToSell: "fast" (about a week or less), "medium" (a few weeks), or "slow" (a month or more)
+- speedReason: one short sentence
+- box: a short package type (for example "poly mailer" or "small sturdy box")
+- weightOz: estimated packed weight in ounces, a number
+- notes: anything she should look for (flaws, authenticity) without inventing defects you cannot see
+If you cannot tell what the item is, say so, give a wide price range or omit prices, and do not guess a brand.
+Never invent certificates, exact sold comps, or measurements you cannot see.`;
+
+const COMPS_SYSTEM = `You estimate what similar items typically sell for on US resale sites, from general knowledge only.
+Reply with a single JSON object only, no markdown, with these keys:
+- low: a number, conservative typical sold price in US dollars
+- high: a number, optimistic typical sold price in US dollars
+- typical: a number, a usual mid sold price in US dollars
+- reason: one or two short sentences. You MUST say clearly this is an estimate from general knowledge, not from live sold listings.
+- confidence: "low" or "medium" (never "high", because you are not checking live data)
+Do not invent specific sold listings, dates, or exact comparable sales. If the description is vague, say so and give a wide range.`;
+
+const SHIP_SYSTEM = `You suggest a packing box and a packed weight for shipping a used item in the US.
+Reply with a single JSON object only, no markdown, with these keys:
+- box: a short package type (for example "poly mailer" or "small sturdy box")
+- lengthIn, widthIn, heightIn: numbers, inches, a reasonable box or mailer
+- weightOz: a number, estimated packed weight in ounces including packing
+- reason: one short sentence. Say this is a rough estimate; she should weigh the packed item.
+Do not invent exact weights. Prefer a little extra room for padding on breakables.`;
+
+/**
+ * Shared OpenAI JSON chat. The key is never logged. fetchImpl is injectable.
+ */
+export async function chatJson({ system, userText, photos = [], key, fetchImpl, model = AI_MODEL, maxTokens = 700, temperature = 0.4 } = {}) {
+  const k = (key != null ? key : getKey()).trim();
+  if (!k) {
+    const err = new Error("Paste the AI key in Settings first.");
+    err.code = "no-key";
+    throw err;
+  }
+  const shots = (photos || []).map(p => p.dataUrl || p).filter(Boolean).slice(0, MAX_PHOTOS_FOR_AI);
+  const content = [{ type: "text", text: userText || "" }];
+  for (const url of shots) content.push({ type: "image_url", image_url: { url, detail: "low" } });
+  const fetchFn = fetchImpl || globalThis.fetch;
+  let res;
+  try {
+    res = await fetchFn("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer " + k
+      },
+      body: JSON.stringify({
+        model,
+        response_format: { type: "json_object" },
+        temperature,
+        max_tokens: maxTokens,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content }
+        ]
+      })
+    });
+  } catch (e) {
+    const err = new Error("Couldn't reach the AI service. Check your connection and try again.");
+    err.code = "network";
+    throw err;
+  }
+  const raw = await res.text();
+  if (!res.ok) {
+    const err = new Error(friendlyApiError(res.status, raw));
+    err.code = "http-" + res.status;
+    throw err;
+  }
+  let payload;
+  try { payload = JSON.parse(raw); }
+  catch (e) { throw new Error("The answer wasn't in a form we could use. Try again."); }
+  const text = payload && payload.choices && payload.choices[0] && payload.choices[0].message
+    ? payload.choices[0].message.content : "";
+  const json = extractJson(text);
+  return { json, usage: payload.usage || null, model: payload.model || model };
+}
+
+export async function requestScan({ photos, notes, asking, key, enabledSites, fetchImpl, model = AI_MODEL } = {}) {
+  const shots = (photos || []).map(p => p.dataUrl || p).filter(Boolean);
+  if (!shots.length) {
+    const err = new Error("Take a photo first.");
+    err.code = "no-photo";
+    throw err;
+  }
+  const enabled = Array.isArray(enabledSites) ? enabledSites.filter(Boolean).join(", ") : "";
+  const userText = [
+    "Please identify this item and estimate what it might resell for.",
+    notes ? `Notes: ${notes}` : "",
+    asking != null && asking !== "" ? `The store is asking ${asking} US dollars.` : "",
+    enabled ? `She currently sells on: ${enabled}.` : ""
+  ].filter(Boolean).join("\n");
+  return chatJson({ system: SCAN_SYSTEM, userText, photos, key, fetchImpl, model, maxTokens: 700, temperature: 0.3 });
+}
+
+export async function requestCompsEstimate({ title, category, brand, condition, notes, photos, key, fetchImpl, model = AI_MODEL } = {}) {
+  const userText = [
+    "Estimate typical sold prices for this item.",
+    title ? `Title: ${title}` : "",
+    category ? `Category: ${category}` : "",
+    brand ? `Brand: ${brand}` : "",
+    condition ? `Condition: ${condition}` : "",
+    notes ? `Notes: ${notes}` : "",
+    "Say clearly this is an estimate, not live sold data."
+  ].filter(Boolean).join("\n");
+  if (!title && !(photos || []).length) {
+    const err = new Error("Add a title or a photo first.");
+    err.code = "no-input";
+    throw err;
+  }
+  return chatJson({ system: COMPS_SYSTEM, userText, photos: photos || [], key, fetchImpl, model, maxTokens: 400, temperature: 0.3 });
+}
+
+export async function requestShipSuggest({ photos, title, category, condition, key, fetchImpl, model = AI_MODEL } = {}) {
+  const userText = [
+    "Suggest a box and a packed weight for shipping this item in the US.",
+    title ? `Title: ${title}` : "",
+    category ? `Category: ${category}` : "",
+    condition ? `Condition: ${condition}` : ""
+  ].filter(Boolean).join("\n");
+  return chatJson({ system: SHIP_SYSTEM, userText, photos: photos || [], key, fetchImpl, model, maxTokens: 300, temperature: 0.2 });
+}
+
 /** A tiny, cheap request that only checks whether the key is accepted. */
 export async function checkKey(key, fetchImpl) {
   const k = (key != null ? key : getKey()).trim();

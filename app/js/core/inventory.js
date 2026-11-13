@@ -60,6 +60,12 @@ export function emptyItem(partial = {}, at = Date.now()) {
     notes: "",
     siteAdvice: { bestPrice: { sites: [], reason: "" }, fastestSale: { sites: [], reason: "" } },
     sitePlan: "own",
+    shippingPaid: null,
+    comps: { ai: null, logged: [] },
+    askingHistory: [],
+    priceUpdates: {},
+    shipSuggest: null,
+    scan: null,
     ...partial
   }, at);
 }
@@ -96,7 +102,58 @@ export function normalizeItem(raw = {}, at = Date.now()) {
   item.notes = String(item.notes || "");
   item.siteAdvice = normalizeAdvice(item.siteAdvice);
   item.sitePlan = SITE_PLANS.includes(item.sitePlan) ? item.sitePlan : "own";
+  item.shippingPaid = money(item.shippingPaid);
+  item.comps = normalizeComps(item.comps);
+  item.askingHistory = Array.isArray(item.askingHistory) ? item.askingHistory.map(normalizeHistory).filter(Boolean) : [];
+  item.priceUpdates = normalizePriceUpdates(item.priceUpdates);
+  item.shipSuggest = item.shipSuggest && typeof item.shipSuggest === "object" ? item.shipSuggest : null;
+  item.scan = item.scan && typeof item.scan === "object" ? item.scan : null;
   return deriveStage(item);
+}
+
+function normalizeComps(raw) {
+  const src = raw && typeof raw === "object" ? raw : {};
+  const logged = Array.isArray(src.logged) ? src.logged.map(c => {
+    if (!c || typeof c !== "object") return null;
+    const price = money(c.price);
+    if (price == null) return null;
+    return { id: String(c.id || ""), price, siteId: String(c.siteId || ""), note: String(c.note || ""), at: c.at || 0 };
+  }).filter(Boolean) : [];
+  const ai = src.ai && typeof src.ai === "object" ? {
+    low: money(src.ai.low),
+    high: money(src.ai.high),
+    typical: money(src.ai.typical),
+    reason: String(src.ai.reason || ""),
+    confidence: String(src.ai.confidence || ""),
+    at: src.ai.at || 0,
+    source: "ai-estimate"
+  } : null;
+  return { ai, logged };
+}
+
+function normalizeHistory(h) {
+  if (!h || typeof h !== "object") return null;
+  return {
+    siteId: String(h.siteId || ""),
+    from: money(h.from),
+    to: money(h.to),
+    percent: Number(h.percent) || 0,
+    action: String(h.action || ""),
+    status: String(h.status || ""),
+    reason: String(h.reason || ""),
+    at: h.at || 0
+  };
+}
+
+function normalizePriceUpdates(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const id of SITE_IDS) {
+    const v = raw[id];
+    if (!v || typeof v !== "object") continue;
+    out[id] = { needed: !!v.needed, action: String(v.action || ""), toPrice: money(v.toPrice), at: v.at || 0, doneAt: v.doneAt || null };
+  }
+  return out;
 }
 
 function pickSiteMap(map) {
@@ -167,14 +224,15 @@ export function needsDelistHighlight(item) {
   return !!(item && item.soldAt && pendingDelist(item).length > 0);
 }
 
-/** Profit after cost and fees. Null until a sale price is set. Missing cost or fees count as 0. */
+/** Profit after cost, fees, and shipping she paid. Null until a sale price is set. Missing cost, fees, or shipping count as 0. */
 export function profit(item) {
   if (!item) return null;
   const sale = money(item.salePrice);
   if (sale == null) return null;
   const cost = money(item.costPaid) ?? 0;
   const fees = money(item.fees) ?? 0;
-  return money(sale - cost - fees);
+  const ship = money(item.shippingPaid) ?? 0;
+  return money(sale - cost - fees - ship);
 }
 
 export function monthKey(at = Date.now()) {
@@ -225,7 +283,7 @@ export function setListed(item, siteId, listed = true, at = Date.now()) {
  * Mark the item sold. If the sale site was not already in listedOn, it is added
  * (she sold it there, so it was listed there). That site is not a delist target.
  */
-export function markSold(item, { siteId, salePrice, fees, at = Date.now() } = {}) {
+export function markSold(item, { siteId, salePrice, fees, shippingPaid, at = Date.now() } = {}) {
   let listedOn = { ...(item.listedOn || {}) };
   let soldOn = item.soldOn;
   if (siteId && isKnownSite(siteId)) {
@@ -238,6 +296,7 @@ export function markSold(item, { siteId, salePrice, fees, at = Date.now() } = {}
     soldOn,
     salePrice: salePrice !== undefined ? money(salePrice) : item.salePrice,
     fees: fees !== undefined ? money(fees) : item.fees,
+    shippingPaid: shippingPaid !== undefined ? money(shippingPaid) : item.shippingPaid,
     soldAt: item.soldAt || at,
     updatedAt: at
   };
@@ -388,6 +447,12 @@ export function exportPayload(items, version, at = Date.now(), extras = {}) {
     items: (items || []).map(i => normalizeItem(i, at))
   };
   if (Array.isArray(extras.enabledSites)) out.enabledSites = knownSiteIds(extras.enabledSites);
+  if (Array.isArray(extras.mileage)) out.mileage = extras.mileage;
+  if (extras.settings && typeof extras.settings === "object") {
+    const s = { ...extras.settings };
+    delete s.apiKey; delete s.key; delete s.openai; delete s.token;
+    out.settings = s;
+  }
   return out;
 }
 
@@ -404,4 +469,18 @@ export function importEnabledSites(data) {
   if (!data || typeof data !== "object" || !Array.isArray(data.enabledSites)) return null;
   const ids = knownSiteIds(data.enabledSites);
   return ids.length ? ids : null;
+}
+
+/** Mileage trips from a backup, or null if the file didn't have them. */
+export function importMileage(data) {
+  if (!data || typeof data !== "object" || !Array.isArray(data.mileage)) return null;
+  return data.mileage;
+}
+
+/** Settings from a backup (never a key), or null. */
+export function importSettings(data) {
+  if (!data || typeof data !== "object" || !data.settings || typeof data.settings !== "object") return null;
+  const s = { ...data.settings };
+  delete s.apiKey; delete s.key; delete s.openai; delete s.token;
+  return s;
 }
