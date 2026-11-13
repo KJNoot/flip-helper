@@ -27,6 +27,7 @@ export function renderHome(ctx, el) {
       <div class="hero-actions">
         <a class="btn" href="#/add" data-cta="add">📷 Add an item</a>
         <a class="btn hero-secondary" href="#/scan" data-cta="scan">🔎 Buy or pass</a>
+        <a class="btn hero-secondary" href="#/secondlook" data-cta="secondlook">👀 Second look: scan a table</a>
       </div>
     </div>
     ${paused ? `<div class="card alert" id="pause-banner">
@@ -50,7 +51,7 @@ export function renderHome(ctx, el) {
     <div class="section-title"><h3>Your items</h3><a href="#/items">See all</a></div>
     ${recent.length
       ? `<ul class="itemlist">${recent.map(row).join("")}</ul>`
-      : `<div class="card empty"><span class="em">📷</span><p>No items yet. Take a photo to start a draft, or use Buy or pass at a thrift store.</p></div>`}
+      : `<div class="card empty"><span class="em">📷</span><p>No items yet. Take a photo to start a draft, or use Buy or pass at a thrift store. Or tap Second look to scan a whole table.</p></div>`}
     <div class="card flat">
       <div class="row between"><h3>${esc(String(year))} taxes</h3>${honesty("ok", "Working")}</div>
       <p class="small">Income ${esc(formatUsd(ytot.income))} · after cost, fees, and shipping ${esc(formatUsd(ytot.goodsProfit))} · ${esc(String(ytot.miles))} miles logged.</p>
@@ -59,8 +60,8 @@ export function renderHome(ctx, el) {
     </div>
     <div class="card flat honesty-card">
       <h3>What this version does</h3>
-      <p class="small">${honesty("ok", "Working")} Photo to a draft, Buy or pass, a tracker, a sold take-down checklist with a guided walk-through, price-drop ideas, profit and taxes, a morning list, and an Ask-a-question helper.</p>
-      <p class="small">${honesty("warn", "Estimate")} AI prices, sold-price estimates, fees, shipping costs, and Buy or pass verdicts. Check them yourself.</p>
+      <p class="small">${honesty("ok", "Working")} Photo to a draft, Buy or pass, Second look (scan a table), a tracker, a sold take-down checklist with a guided walk-through, price-drop ideas, profit and taxes, a morning list, and an Ask-a-question helper.</p>
+      <p class="small">${honesty("warn", "Estimate")} AI prices, sold-price estimates, fees, shipping costs, Buy or pass verdicts, and Second look guesses. Check them yourself.</p>
       <p class="small">${honesty("warn", "Needs you to post")} You copy the listing and post it in each site's own app. Taking it down and changing a price is a checklist, not automatic. A guided walk-through can open each site for you.</p>
       <p class="small">${honesty("later", "Coming later")} Official one-tap listing and take-down (starting with eBay), official eBay sold prices, a computer helper, and buying shipping labels.</p>
     </div>

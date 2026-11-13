@@ -284,16 +284,18 @@ Do not invent exact weights. Prefer a little extra room for padding on breakable
 /**
  * Shared OpenAI JSON chat. The key is never logged. fetchImpl is injectable.
  */
-export async function chatJson({ system, userText, photos = [], key, fetchImpl, model = AI_MODEL, maxTokens = 700, temperature = 0.4 } = {}) {
+export async function chatJson({ system, userText, photos = [], key, fetchImpl, model = AI_MODEL, maxTokens = 700, temperature = 0.4, maxPhotos = MAX_PHOTOS_FOR_AI, imageDetail = "low" } = {}) {
   const k = (key != null ? key : getKey()).trim();
   if (!k) {
     const err = new Error("Paste the AI key in Settings first.");
     err.code = "no-key";
     throw err;
   }
-  const shots = (photos || []).map(p => p.dataUrl || p).filter(Boolean).slice(0, MAX_PHOTOS_FOR_AI);
+  const limit = Number.isFinite(Number(maxPhotos)) && Number(maxPhotos) > 0 ? Math.floor(Number(maxPhotos)) : MAX_PHOTOS_FOR_AI;
+  const shots = (photos || []).map(p => p.dataUrl || p).filter(Boolean).slice(0, limit);
+  const detail = imageDetail === "high" ? "high" : "low";
   const content = [{ type: "text", text: userText || "" }];
-  for (const url of shots) content.push({ type: "image_url", image_url: { url, detail: "low" } });
+  for (const url of shots) content.push({ type: "image_url", image_url: { url, detail } });
   const fetchFn = fetchImpl || globalThis.fetch;
   let res;
   try {

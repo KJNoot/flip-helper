@@ -19,6 +19,7 @@ import { openTerms } from "../terms.js";
 import { shouldShowTermsInSettings, clearTerms } from "../../core/invite.js";
 import { clearAskHistory } from "../ask.js";
 import { clearWork, clearScanWork, clearBatch } from "../../core/autosave.js";
+import { clearSecondLook } from "../../core/secondlook.js";
 import { tip, openTip } from "../tips.js";
 import { PHOTO_CLEANUP_NOTE } from "../../core/photo.js";
 
@@ -170,15 +171,15 @@ export function renderSettings(ctx, el) {
 
     <div class="card flat honesty-card">
       <h3>What this version does</h3>
-      <p class="small">${honesty("ok", "Working")} A first-open welcome and a “try it before you install” demo (sandboxed — nothing is posted, and your real items are left alone), photo to a draft, Buy or pass with a “Buy up to” amount, inventory with bins and QR labels, full profit, a sold take-down checklist with a guided walk-through, price-drop ideas that respect your profit floor, a morning list, taxes, CSV import and export, and an Ask-a-question helper. Works offline except for AI checks. The first-open welcome plays a short promo video (muted, with tap-for-sound and a skip button). A private invite can show a short terms summary before that video; the public link does not.</p>
-      <p class="small">${honesty("warn", "Estimate")} AI prices, sold-price estimates, fees, shipping costs, pricing options, and Buy or pass verdicts.</p>
+      <p class="small">${honesty("ok", "Working")} A first-open welcome and a “try it before you install” demo (sandboxed — nothing is posted, and your real items are left alone), photo to a draft, Buy or pass with a “Buy up to” amount, Second look (scan a table), inventory with bins and QR labels, full profit, a sold take-down checklist with a guided walk-through, price-drop ideas that respect your profit floor, a morning list, taxes, CSV import and export, and an Ask-a-question helper. Works offline except for AI checks. The first-open welcome plays a short promo video (muted, with tap-for-sound and a skip button). A private invite can show a short terms summary before that video; the public link does not.</p>
+      <p class="small">${honesty("warn", "Estimate")} AI prices, sold-price estimates, fees, shipping costs, pricing options, Buy or pass verdicts, and Second look guesses.</p>
       <p class="small">${honesty("warn", "Needs you to post")} Posting, taking listings down, and changing a price is something you do in each site's own app. The guided take-down opens each site and ticks it off when you say you did it. Jessika's Flip Side does not log into those accounts.</p>
-      <p class="small">${honesty("later", "Coming later")} Official one-tap listing and take-down (eBay, Etsy, Shopify first), official eBay sold prices, a computer helper, and buying shipping labels. Some sites will always need your tap. Not promised for Poshmark, Mercari, or Facebook Marketplace unless those companies open an official door.</p>
+      <p class="small">${honesty("later", "Coming later")} Official one-tap listing and take-down (eBay, Etsy, Shopify first), official eBay sold prices, a computer helper, buying shipping labels, and a live “coach me in my earbud” mode for haggling. Some sites will always need your tap. Not promised for Poshmark, Mercari, or Facebook Marketplace unless those companies open an official door.</p>
     </div>
 
     <div class="card flat">
       <h3>Privacy</h3>
-      <p class="small">Your items and photos stay on this phone. The AI key stays on this phone. A photo is sent to the AI service only when you ask for a draft. No account is required. Jessika's Flip Side will not ask for a selling-site password.</p>
+      <p class="small">Your items and photos stay on this phone. The AI key stays on this phone. A photo is sent to the AI service only when you ask for a draft, a Buy or pass check, or a Second look scan. Second look frames are not uploaded anywhere else, and thumbnails stay on this phone. No account is required. Jessika's Flip Side will not ask for a selling-site password.</p>
     </div>
     <p class="tiny muted center" id="no-sub">${esc(NO_SUBSCRIPTION_NOTE)}</p>
     <p class="tiny muted center">Jessika's Flip Side v${esc(ctx.version)}</p>
@@ -392,7 +393,7 @@ export function renderSettings(ctx, el) {
       ctx.render();
     },
     wipe: async () => {
-      if (!(await confirmSheet({ title: "Delete everything?", body: "Every item and photo on this phone will be erased. The AI key will be removed too. Export a backup first if you want to keep your items.", ok: "Delete everything", danger: true }))) return;
+      if (!(await confirmSheet({ title: "Delete everything?", body: "Every item, photo, and Second look scan on this phone will be erased. The AI key will be removed too. Export a backup first if you want to keep your items.", ok: "Delete everything", danger: true }))) return;
       await ctx.store.wipe();
       removeKey();
       clearEnabledIds();
@@ -404,6 +405,7 @@ export function renderSettings(ctx, el) {
       clearScanWork();
       clearBatch();
       clearAskHistory();
+      clearSecondLook();
       setWalkthroughDone(false);
       clearTerms();
       ctx.work = null;
