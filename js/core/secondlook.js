@@ -415,7 +415,12 @@ export function normalizeLookItem(raw, index = 0, frames = []) {
     closeupPhotos: normalizeCloseupPhotos(raw.closeupPhotos),
     closeupDraft: raw.closeupDraft && typeof raw.closeupDraft === "object" ? raw.closeupDraft : null,
     listedItemId: String(raw.listedItemId || ""),
-    listNowAt: raw.listNowAt || null
+    listNowAt: raw.listNowAt || null,
+    quantity: Number(raw.quantity) > 0 ? Math.round(Number(raw.quantity)) : (raw.quantity == null ? undefined : 1),
+    lookedDeeper: !!raw.lookedDeeper,
+    tile: raw.tile != null && Number.isFinite(Number(raw.tile)) ? Number(raw.tile) : undefined,
+    boxRefined: !!raw.boxRefined,
+    sourceScanIds: Array.isArray(raw.sourceScanIds) ? raw.sourceScanIds.map(String) : undefined
   };
 }
 
@@ -1019,7 +1024,13 @@ export function normalizeScan(raw, at = Date.now()) {
       closeupDraft: (src && src.closeupDraft) || it.closeupDraft || null,
       listedItemId: String((src && src.listedItemId) || it.listedItemId || ""),
       listNowAt: (src && src.listNowAt) || it.listNowAt || null,
-      condition: (src && src.condition) || it.condition || ""
+      condition: (src && src.condition) || it.condition || "",
+      quantity: src && Number(src.quantity) > 0 ? Math.round(Number(src.quantity)) : it.quantity,
+      lookedDeeper: !!(src && src.lookedDeeper) || !!it.lookedDeeper,
+      tile: src && src.tile != null ? src.tile : it.tile,
+      boxRefined: !!(src && src.boxRefined) || !!it.boxRefined,
+      brand: String((src && src.brand) || it.brand || ""),
+      sourceScanIds: Array.isArray(src && src.sourceScanIds) ? src.sourceScanIds.map(String) : it.sourceScanIds
     };
   });
   return {
@@ -1033,7 +1044,12 @@ export function normalizeScan(raw, at = Date.now()) {
     note: parsed.note || String(raw.note || "").trim(),
     warning: String(raw.warning || "").trim(),
     unread: raw.unread !== false,
-    coverThumb: typeof raw.coverThumb === "string" ? raw.coverThumb : ""
+    coverThumb: typeof raw.coverThumb === "string" ? raw.coverThumb : "",
+    lookedDeeper: !!raw.lookedDeeper,
+    lookedDeeperAt: raw.lookedDeeperAt || null,
+    loadScanIds: Array.isArray(raw.loadScanIds) ? raw.loadScanIds.map(String) : [],
+    mergedInto: String(raw.mergedInto || ""),
+    loadNote: String(raw.loadNote || "")
   };
 }
 
@@ -1382,6 +1398,12 @@ function setJob(next) {
   job = next;
   notify();
 }
+
+export { setJob };
+
+export function isJobCancelled() { return cancelFlag; }
+
+export function resetCancelFlag() { cancelFlag = false; }
 
 export function resetJob() {
   cancelFlag = false;
