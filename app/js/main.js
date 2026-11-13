@@ -23,7 +23,7 @@ import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.j
 import { shouldShowTermsGate, rememberInviteIfValid } from "./core/invite.js";
 import { openTerms, closeTerms, isTermsOpen } from "./ui/terms.js";
 
-export const VERSION = "0.6.0";
+export const VERSION = "0.6.1";
 
 const view = $("#view");
 const store = await createStore();
@@ -106,7 +106,7 @@ function render() {
   } else if (head === "scan") {
     renderScan(ctx, view);
   } else if (head === "secondlook") {
-    renderSecondLook(ctx, view, rest[0] || "");
+    renderSecondLook(ctx, view, rest[0] || "", rest);
   } else if (head === "taxes") {
     renderTaxes(ctx, view, rest[0]);
   } else if (head === "sites") {

@@ -17,7 +17,7 @@ export const WALKTHROUGH_SCREENS = [
     id: "add",
     title: "Start with a photo",
     body: "On the bottom row, tap Add. Take a photo, then tap “Make a draft from the photo”. Check the draft, change anything that's wrong, and tap Save.",
-    extra: "You can also write the listing yourself, use Buy or pass at a thrift store to see if an item is worth buying, or tap Second look: scan a table to film a whole table and get things worth a closer look."
+    extra: "You can also write the listing yourself, use Buy or pass at a thrift store to see if an item is worth buying, or tap Second look: scan a table to film a whole table, get things worth a closer look, and go check each one up close."
   },
   {
     id: "sell",

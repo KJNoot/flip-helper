@@ -245,7 +245,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Jessika's Flip Side v0\.6\.0/);
+    assert.match(await text(), /Jessika's Flip Side v0\.6\.1/);
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);
@@ -774,6 +774,32 @@ try {
     });
   };
 
+  const mockCloseup = {
+    title: "Speckled ceramic mug",
+    category: "Kitchen",
+    condition: "Good",
+    brand: "",
+    priceLow: 18,
+    priceHigh: 32,
+    priceReason: "From the close-up: a well-made mug. This is an estimate, not from sold listings.",
+    daysToSell: "medium",
+    notes: "Looked at the bottom; no chips.",
+    box: "small sturdy box",
+    weightOz: 16
+  };
+
+  const fulfillCloseup = async (route, { delay = 0 } = {}) => {
+    if (delay) await new Promise(r => setTimeout(r, delay));
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        choices: [{ message: { content: JSON.stringify(mockCloseup) } }],
+        usage: { prompt_tokens: 8, completion_tokens: 8 }
+      })
+    });
+  };
+
   await step("Second look: home button, no-key message, photo scan with a mocked AI, results and haggle", async () => {
     // Fresh page so we don't fight the welcome video or leftover state.
     const p3 = await context.newPage();
@@ -872,17 +898,26 @@ try {
     assert.match(res, /likely low value|plastic bottle|stack of papers/i);
     assert.ok(await p3.isVisible('[data-act="closeup"]'));
     assert.ok(await p3.isVisible('[data-act="haggle"]'));
+    assert.ok(await p3.isVisible('[data-act="listit"]'));
     assert.ok(await p3.isVisible('[data-act="dismiss"]'));
+    assert.match(res, /0 of 3 checked/);
+    assert.match(res, /First guess from the table: check it up close/);
+    assert.match(res, /Go check this one/);
+    assert.match(res, /Take a picture of just this item/);
+    assert.match(res, /Find it/);
+    assert.match(res, /List it/);
+    assert.doesNotMatch(res, /Bought, on the way home/);
+    assert.doesNotMatch(res, /I didn't buy it/);
     // Scans are saved locally.
     const saved = await p3.evaluate(() => window.__flip.getScans());
     assert.ok(saved.length >= 1);
     assert.match(saved[0].items[0].name, /mug|frame|tote/i);
-    await shotSl("v6-results", "v6-results.png");
+    await shotSl("v61-results", "v61-results.png");
 
-    // A single card, close up.
+    // A single card: steps and Go check this one.
     const card = p3.locator(".sl-card").first();
     await card.scrollIntoViewIfNeeded();
-    await shotSl("v6-card", "v6-card.png");
+    await shotSl("v61-card", "v61-card.png");
 
     // Haggle helper: numbers, lines, bundle tip, Coming later on the earbud.
     await p3.locator('[data-act="haggle"]').first().click();
@@ -896,19 +931,55 @@ try {
     assert.match(hag, /Bundle tip/);
     assert.match(hag, /Coming later/);
     assert.match(hag, /earbud/i);
+    assert.match(hag, /first guess from the table/i);
     await shotSl("v6-haggle", "v6-haggle.png");
     await p3.click('#sl-haggle-sheet [data-r="0"]');
     await p3.waitForSelector("#sl-haggle-sheet", { state: "detached" });
 
-    // Take a close-up: existing Buy or pass, prefilled, not modified.
+    // Go check this one: our close-up screen, not Buy or pass.
     await p3.locator('[data-act="closeup"]').first().click();
-    await p3.waitForTimeout(400);
-    assert.match(await p3.evaluate(() => location.hash), /#\/scan/);
-    const closeup = await p3.textContent("#view");
-    assert.match(closeup, /Buy or pass/);
-    assert.match(closeup, /Speckled ceramic mug|Wooden picture frame|Navy canvas tote/);
-    assert.match(closeup, /Identify and check/);
-    assert.match(closeup, /Buy up to|Resale estimate|Estimate/);
+    await p3.waitForSelector("#sl-check", { timeout: 8000 });
+    assert.match(await p3.evaluate(() => location.hash), /#\/secondlook\/.+\/check\//);
+    const checkPage = await p3.textContent("#view");
+    assert.match(checkPage, /Go check this one|Find it|Snap a close photo/);
+    assert.match(checkPage, /Take a picture of just this item/);
+    assert.match(checkPage, /Speckled ceramic mug|Wooden picture frame|Navy canvas tote/);
+    assert.doesNotMatch(checkPage, /Buy or pass/);
+    assert.doesNotMatch(checkPage, /Identify and check/);
+
+    // Close-up photo runs existing single-item pricing, then returns Checked.
+    await p3.unroute("https://api.openai.com/v1/chat/completions");
+    await p3.route("https://api.openai.com/v1/chat/completions", route => fulfillCloseup(route));
+    await p3.locator("#sl-check-cam").setInputFiles(tablePath);
+    await p3.waitForFunction(() => {
+      const b = document.querySelector('[data-act="runcloseup"]');
+      return b && !b.disabled;
+    }, { timeout: 8000 });
+    await p3.locator('[data-act="runcloseup"]').click();
+    await p3.waitForSelector(".sl-card-checked, [data-checked='1']", { timeout: 20000 });
+    const after = await p3.textContent("#view");
+    assert.match(after, /Checked/);
+    assert.match(after, /1 of 3 checked/);
+    assert.match(after, /\$18\.00 to \$32\.00/);
+    assert.match(after, /List it/);
+
+    // List it: existing listing flow, prefilled, no extra on-the-way status.
+    await p3.locator(".sl-card-checked [data-act='listit'], [data-checked='1'] [data-act='listit']").first().click();
+    await p3.waitForFunction(() => /#\/item\//.test(location.hash), { timeout: 8000 });
+    const listing = await p3.textContent("#view");
+    assert.match(listing, /Speckled ceramic mug/);
+    assert.match(listing, /Post it|Needs you to post/);
+    assert.doesNotMatch(listing, /Bought, on the way home/);
+    assert.doesNotMatch(listing, /I didn't buy it/);
+    assert.doesNotMatch(listing, /Confirm you bought/);
+    await shotSl("v61-list-now", "v61-list-now.png");
+
+    // Existing Buy or pass is still its own unchanged screen.
+    await p3.evaluate(h => { location.hash = h; }, "#/scan");
+    await p3.waitForTimeout(250);
+    const scanAgain = await p3.textContent("#view");
+    assert.match(scanAgain, /Buy or pass/);
+    assert.match(scanAgain, /Identify and check/);
 
     await p3.unroute("https://api.openai.com/v1/chat/completions");
     await p3.close();
@@ -947,7 +1018,9 @@ try {
     const res = await p4.textContent("#view");
     assert.match(res, /Worth a closer look/);
     assert.match(res, /Speckled ceramic mug/);
-    assert.match(res, /Estimate/);
+    assert.match(res, /0 of 3 checked|First guess from the table/);
+    assert.match(res, /Go check this one/);
+    assert.match(res, /List it/);
     const scans = await p4.evaluate(() => window.__flip.getScans());
     assert.ok(scans.some(s => s.kind === "video"));
     // Dismiss a card.

@@ -388,12 +388,14 @@ describe("card and haggle rendering", () => {
     assert.match(html, /Brass clock/);
     assert.match(html, /left side of the table, near the clocks/);
     assert.match(html, /\$40\.00 to \$80\.00/);
-    assert.match(html, /Estimate/);
-    assert.match(html, /AI guess/);
-    assert.match(html, /Check it yourself/);
+    assert.match(html, /First guess from the table: check it up close/);
+    assert.match(html, /Find it/);
+    assert.match(html, /Snap a close photo/);
     assert.match(html, /maker&#39;s marks|maker's marks/);
-    assert.match(html, /Take a close-up/);
+    assert.match(html, /Go check this one/);
+    assert.match(html, /Take a picture of just this item/);
     assert.match(html, /Help me haggle/);
+    assert.match(html, /List it/);
     assert.match(html, /Not interested/);
     assert.match(html, /Buy up to \$25/);
     assert.match(html, /data:image\/gif/);
@@ -540,7 +542,8 @@ describe("API request and close-up handoff", () => {
 describe("guide, walkthrough, version, and privacy", () => {
   it("adds Second look to the Ask helper's guide and the first-run walkthrough, without dropping existing screens", () => {
     assert.match(FEATURE_GUIDE, /Second look: scan a table/);
-    assert.match(FEATURE_GUIDE, /Take a close-up/);
+    assert.match(FEATURE_GUIDE, /Go check this one/);
+    assert.match(FEATURE_GUIDE, /List it/);
     assert.match(FEATURE_GUIDE, /Help me haggle/);
     assert.match(FEATURE_GUIDE, /Coming later/);
     assert.match(FEATURE_GUIDE, /sent only to the AI service/);
@@ -550,13 +553,13 @@ describe("guide, walkthrough, version, and privacy", () => {
     for (const s of WALKTHROUGH_SCREENS) assert.ok(s.body.length < 500);
   });
 
-  it("bumps the app, package, and service worker to v0.6.0 and caches the new modules", () => {
+  it("bumps the app, package, and service worker to v0.6.1 and caches the new modules", () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.6.0");
+    assert.equal(pkg.version, "0.6.1");
     const main = readFileSync(join(APP, "js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.6\.0"/);
+    assert.match(main, /export const VERSION = "0\.6\.1"/);
     const sw = readFileSync(join(APP, "sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.6\.0/);
+    assert.match(sw, /flip-helper-v0\.6\.1/);
     assert.match(sw, /js\/core\/secondlook\.js/);
     assert.match(sw, /js\/ui\/screens\/secondlook\.js/);
     assert.doesNotMatch(sw, /media\/intro\.mp4/);

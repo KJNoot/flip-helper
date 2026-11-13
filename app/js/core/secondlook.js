@@ -7,9 +7,9 @@
 
 import { money, formatUsd } from "./inventory.js";
 import { getKey } from "./key.js";
-import { chatJson, extractJson, fileToDataUrl, downscaleDataUrl, AI_MODEL } from "./draft.js";
+import { chatJson, extractJson, fileToDataUrl, downscaleDataUrl, AI_MODEL, requestScan } from "./draft.js";
 import { buyUpTo, buyUpToLabel } from "./profit.js";
-import { scanResult } from "./scanner.js";
+import { scanResult, normalizeScanDraft, itemFromScan } from "./scanner.js";
 import { getSettings } from "./settings.js";
 import { getEnabledIds } from "./prefs.js";
 import { feeFor } from "./fees.js";
@@ -371,7 +371,12 @@ export function normalizeLookItem(raw, index = 0, frames = []) {
       where: "on the table",
       whatToCheck: [],
       thumbDataUrl: "",
-      dismissed: false
+      dismissed: false,
+      checked: false,
+      checkedAt: null,
+      firstGuess: null,
+      verified: null,
+      closeupPhotos: []
     };
   }
   if (typeof raw !== "object") return null;
@@ -401,7 +406,16 @@ export function normalizeLookItem(raw, index = 0, frames = []) {
     thumbDataUrl: typeof raw.thumbDataUrl === "string" ? raw.thumbDataUrl : "",
     dismissed: !!raw.dismissed,
     brand: String(raw.brand || "").trim(),
-    category: String(raw.category || "").trim()
+    category: String(raw.category || "").trim(),
+    condition: String(raw.condition || "").trim(),
+    checked: !!raw.checked,
+    checkedAt: raw.checkedAt || null,
+    firstGuess: normalizeFirstGuess(raw.firstGuess),
+    verified: normalizeVerified(raw.verified),
+    closeupPhotos: normalizeCloseupPhotos(raw.closeupPhotos),
+    closeupDraft: raw.closeupDraft && typeof raw.closeupDraft === "object" ? raw.closeupDraft : null,
+    listedItemId: String(raw.listedItemId || ""),
+    listNowAt: raw.listNowAt || null
   };
 }
 
@@ -630,7 +644,161 @@ export function decorateItem(item, opts) {
   return { ...item, buyUpTo: est.buyUpTo, buyUpToLabel: est.buyUpToLabel, haggle: est.haggle };
 }
 
-/* ---------- card HTML (pure; no document) ---------- */
+export const FIRST_GUESS_LABEL = "First guess from the table: check it up close";
+
+export function normalizeFirstGuess(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    name: String(raw.name || "").trim(),
+    priceLow: money(raw.priceLow),
+    priceHigh: money(raw.priceHigh),
+    priceNote: String(raw.priceNote || "").trim(),
+    why: String(raw.why || "").trim(),
+    buyUpTo: money(raw.buyUpTo),
+    buyUpToLabel: String(raw.buyUpToLabel || "").trim(),
+    haggle: raw.haggle || null,
+    confidence: raw.confidence || "medium"
+  };
+}
+
+export function normalizeVerified(raw) {
+  if (!raw || typeof raw !== "object") return null;
+  return {
+    name: String(raw.name || raw.title || "").trim(),
+    priceLow: money(raw.priceLow),
+    priceHigh: money(raw.priceHigh),
+    priceNote: String(raw.priceNote || raw.priceReason || "").trim(),
+    brand: String(raw.brand || "").trim(),
+    condition: String(raw.condition || "").trim(),
+    category: String(raw.category || "").trim(),
+    at: raw.at || null
+  };
+}
+
+export function normalizeCloseupPhotos(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(p => {
+    if (typeof p === "string" && p.startsWith("data:")) return { dataUrl: p };
+    if (p && typeof p === "object" && typeof p.dataUrl === "string") {
+      return { dataUrl: p.dataUrl, name: p.name || "", addedAt: p.addedAt || null };
+    }
+    return null;
+  }).filter(Boolean).slice(0, 8);
+}
+
+/** Keep the original table-scan guess if we already have one; otherwise snapshot the current fields. */
+export function snapshotFirstGuess(item) {
+  if (!item || typeof item !== "object") return null;
+  if (item.firstGuess && typeof item.firstGuess === "object") {
+    const snap = normalizeFirstGuess(item.firstGuess);
+    if (snap && (snap.name || snap.priceLow != null || snap.priceHigh != null)) return snap;
+  }
+  return normalizeFirstGuess(item);
+}
+
+/** After a close-up is priced (existing requestScan + normalizeScanDraft), mark the card Checked and replace the first guess on the card. */
+export function applyCloseupResult(item, { draft, result, photos } = {}, at = Date.now(), opts) {
+  const it = item || {};
+  const first = snapshotFirstGuess(it);
+  const d = draft || {};
+  const photosList = normalizeCloseupPhotos(photos);
+  const firstPhoto = photosList[0];
+  const thumb = (firstPhoto && firstPhoto.dataUrl) || it.thumbDataUrl || "";
+  const low = money(d.priceLow);
+  const high = money(d.priceHigh);
+  const next = {
+    ...it,
+    name: String(d.title || it.name || "").trim() || it.name,
+    brand: String(d.brand || it.brand || "").trim(),
+    category: String(d.category || it.category || "").trim(),
+    condition: String(d.condition || "").trim(),
+    priceLow: low,
+    priceHigh: high,
+    priceNote: String(d.priceReason || d.priceNote || "").trim() || "This is an estimate from the close-up, not from checking sold listings.",
+    why: String(d.notes || d.description || it.why || "").trim(),
+    confidence: "medium",
+    firstGuess: first,
+    checked: true,
+    checkedAt: at,
+    closeupPhotos: photosList,
+    closeupDraft: d && typeof d === "object" ? d : null,
+    verified: {
+      name: String(d.title || it.name || "").trim(),
+      priceLow: low,
+      priceHigh: high,
+      priceNote: String(d.priceReason || "").trim(),
+      brand: String(d.brand || "").trim(),
+      condition: String(d.condition || "").trim(),
+      category: String(d.category || "").trim(),
+      at
+    },
+    thumbDataUrl: thumb
+  };
+  return decorateItem(next, opts);
+}
+
+export function closeupNotes(item) {
+  return [
+    "This is a close-up of just this item, to verify a first guess from a table scan.",
+    item && item.name ? "First guess name: " + item.name + "." : "",
+    item && item.where ? "Found at: " + item.where + "." : "",
+    item && item.whatToCheck && item.whatToCheck.length ? "Please look for: " + item.whatToCheck.join("; ") + "." : "",
+    "Identify the item and estimate what it might resell for. Look at any marks, tags, or labels in the photos."
+  ].filter(Boolean).join(" ");
+}
+
+/** Run the existing single-item pricing (requestScan + normalizeScanDraft). Does not change that flow. */
+export async function runCloseupCheck(item, { photos, key, fetchImpl, enabledSites, desiredProfit, model } = {}) {
+  if (!photos || !photos.length) {
+    const err = new Error("Take a picture of just this item first.");
+    err.code = "no-photo";
+    throw err;
+  }
+  const sites = enabledSites || getEnabledSafe();
+  const { json } = await requestScan({
+    photos,
+    notes: closeupNotes(item),
+    key,
+    fetchImpl,
+    enabledSites: sites,
+    model
+  });
+  const draft = normalizeScanDraft(json);
+  return applyCloseupResult(item, { draft, photos }, Date.now(), {
+    desiredProfit,
+    siteIds: sites
+  });
+}
+
+export function setItemOnScan(scanId, item, storage) {
+  if (!item) return getScan(scanId, storage);
+  const scan = getScan(scanId, storage);
+  if (!scan) return null;
+  const items = (scan.items || []).map(it => it.id === item.id ? item : it);
+  return updateScan(scanId, { items }, storage);
+}
+
+/** Unchecked (and not dismissed) first, then checked, then dismissed. */
+export function sortLookItems(items) {
+  const list = Array.isArray(items) ? items.slice() : [];
+  const open = list.filter(i => !i.dismissed);
+  const dismissed = list.filter(i => i.dismissed);
+  const unchecked = open.filter(i => !i.checked);
+  const checked = open.filter(i => i.checked);
+  return [...unchecked, ...checked, ...dismissed];
+}
+
+export function checkedSummary(items) {
+  const open = (items || []).filter(i => !i.dismissed);
+  const checked = open.filter(i => i.checked).length;
+  const total = open.length;
+  return {
+    checked,
+    total,
+    label: `${checked} of ${total} checked`
+  };
+}
+
 
 function esc(s) {
   return String(s ?? "").replace(/[&<>"']/g, c => ({
@@ -652,27 +820,111 @@ export function priceRangeLabel(item) {
   return `${formatUsd(lo)} to ${formatUsd(hi)}`;
 }
 
+/** Prefill a normal inventory item from a close-up (if checked) or the first table guess. Hands data to the existing listing flow; does not change it. */
+export function itemFromLookItem(look, { at = Date.now(), scanId } = {}) {
+  const checked = !!(look && look.checked);
+  const v = (look && look.verified) || {};
+  const d = (look && look.closeupDraft) || {};
+  const first = (look && look.firstGuess) || {};
+  const draft = {
+    title: (checked && (d.title || v.name)) || (look && look.name) || first.name || "Item from a second look",
+    description: (checked && d.description) || "",
+    category: (checked && (d.category || v.category)) || (look && look.category) || "",
+    condition: (checked && (d.condition || v.condition)) || (look && look.condition) || "",
+    brand: (checked && (d.brand || v.brand)) || (look && look.brand) || "",
+    priceLow: checked
+      ? (d.priceLow != null ? d.priceLow : look && look.priceLow)
+      : (look && look.priceLow),
+    priceHigh: checked
+      ? (d.priceHigh != null ? d.priceHigh : look && look.priceHigh)
+      : (look && look.priceHigh),
+    priceReason: (checked && (d.priceReason || (look && look.priceNote))) || (look && look.priceNote) || "",
+    notes: (checked && d.notes) || (look && look.why) || "",
+    daysToSell: (d && d.daysToSell) || "medium",
+    speedReason: (d && d.speedReason) || "",
+    ship: (d && d.ship) || null
+  };
+  const photos = (checked && look.closeupPhotos && look.closeupPhotos.length)
+    ? look.closeupPhotos
+    : (look && look.thumbDataUrl ? [{ dataUrl: look.thumbDataUrl }] : []);
+  const notes = [
+    look && look.where ? "Found at: " + look.where + "." : "",
+    checked ? "From a close-up." : "First guess from a table scan.",
+    look && look.why ? look.why : ""
+  ].filter(Boolean).join("\n");
+  const item = itemFromScan({ photos, draft, asking: null, result: null, notes }, at);
+  return {
+    ...item,
+    secondLookScanId: scanId || (look && look.scanId) || "",
+    secondLookItemId: (look && look.id) || "",
+    askingPrice: money(draft.priceHigh) ?? money(draft.priceLow) ?? item.askingPrice
+  };
+}
+
+function listItButton(it) {
+  return `<button type="button" class="btn soft" data-act="listit" data-id="${esc(it.id || "")}">List it</button>`;
+}
+
 export function lookCardHtml(item, { showActions = true } = {}) {
   const it = item || {};
+  const checked = !!it.checked;
+  const first = snapshotFirstGuess(it) || {};
   const checks = (it.whatToCheck || []).map(c => `<li>${esc(c)}</li>`).join("");
-  const img = it.thumbDataUrl
-    ? `<img class="sl-thumb" src="${esc(it.thumbDataUrl)}" alt="${esc(it.name || "Item")}">`
+  const imgSrc = it.thumbDataUrl;
+  const img = imgSrc
+    ? `<img class="sl-thumb" src="${esc(imgSrc)}" alt="${esc(it.name || "Item")}">`
     : `<div class="sl-thumb sl-thumb-ph" aria-hidden="true">👀</div>`;
-  const conf = it.confidence === "low" ? "Low confidence · AI guess" : "AI guess";
-  const buy = it.buyUpToLabel ? `<p class="small"><b>${esc(it.buyUpToLabel)}</b> ${honesty("warn", "Estimate")}</p>` : "";
-  return `<article class="card sl-card" data-look="${esc(it.id || "")}" id="look-${esc(it.id || "")}">
-    <div class="row between wrap"><h3 class="sl-name">${esc(it.name || "Something on the table")}</h3>${honesty("warn", "Estimate")}</div>
+
+  const steps = `<ol class="sl-steps">
+    <li><b>Find it.</b> ${esc(it.where || "on the table")}</li>
+    <li><b>Check.</b> ${checks ? `<ul>${checks}</ul>` : "Look it over for marks, tags, and condition."}</li>
+    <li><b>Snap a close photo</b> of just this item, and of any mark, tag or label.</li>
+  </ol>`;
+
+  const guessItem = checked ? first : it;
+  const guessRange = priceRangeLabel(guessItem);
+  const guessBuy = (checked ? first.buyUpToLabel : it.buyUpToLabel) || "";
+  const guessWhy = checked ? (first.priceNote || first.why || "") : (it.priceNote || it.why || "");
+  const guessBlock = `<details class="more-block sl-guess">
+    <summary>${esc(FIRST_GUESS_LABEL)}</summary>
+    <p class="small sl-guess-range">${esc(guessRange)}</p>
+    ${guessBuy ? `<p class="small">${esc(guessBuy)} ${honesty("warn", "Estimate")}</p>` : ""}
+    ${guessWhy ? `<p class="tiny muted">${esc(guessWhy)}</p>` : ""}
+  </details>`;
+
+  if (checked) {
+    return `<article class="card sl-card sl-card-checked" data-look="${esc(it.id || "")}" id="look-${esc(it.id || "")}" data-checked="1">
+      <div class="row between wrap"><h3 class="sl-name">${esc(it.name || "Something on the table")}</h3>${honesty("ok", "Checked")}</div>
+      ${img}
+      <p class="small muted">From your close-up. ${honesty("warn", "Estimate")} Still check it yourself.</p>
+      <p class="sl-range">${esc(priceRangeLabel(it))}</p>
+      ${it.buyUpToLabel ? `<p class="small"><b>${esc(it.buyUpToLabel)}</b> ${honesty("warn", "Estimate")}</p>` : ""}
+      ${it.priceNote ? `<p class="small muted">${esc(it.priceNote)}</p>` : ""}
+      ${it.why ? `<p class="small">${esc(it.why)}</p>` : ""}
+      ${showActions ? `<div class="stack sl-actions">
+        <button type="button" class="btn btn-main" data-act="haggle" data-id="${esc(it.id || "")}">💬 Help me haggle</button>
+        <p class="tiny muted sl-haggle-rec">Recommended — this is from your close-up, not the first table guess.</p>
+        ${listItButton(it)}
+        <button type="button" class="btn soft" data-act="closeup" data-id="${esc(it.id || "")}">📷 Take another close-up</button>
+        <button type="button" class="btn ghost" data-act="dismiss" data-id="${esc(it.id || "")}">Not interested</button>
+      </div>` : ""}
+      ${guessBlock}
+    </article>`;
+  }
+
+  return `<article class="card sl-card" data-look="${esc(it.id || "")}" id="look-${esc(it.id || "")}" data-checked="0">
+    <div class="row between wrap"><h3 class="sl-name">${esc(it.name || "Something on the table")}</h3>${honesty("warn", "First guess")}</div>
     ${img}
-    <p class="sl-where"><b>Where:</b> ${esc(it.where || "on the table")}</p>
-    <p class="sl-range">${esc(priceRangeLabel(it))}</p>
-    <p class="tiny muted">${honesty("warn", "Estimate")} ${esc(conf)}. Check it yourself.</p>
-    ${it.priceNote ? `<p class="small muted">${esc(it.priceNote)}</p>` : ""}
-    ${it.why ? `<p class="small">${esc(it.why)}</p>` : ""}
-    ${buy}
-    ${checks ? `<div class="sl-checks"><p class="small"><b>What to check</b></p><ul>${checks}</ul></div>` : ""}
+    ${steps}
     ${showActions ? `<div class="stack sl-actions">
-      <button type="button" class="btn btn-main" data-act="closeup" data-id="${esc(it.id || "")}">📷 Take a close-up</button>
+      <button type="button" class="btn btn-main" data-act="closeup" data-id="${esc(it.id || "")}">Go check this one</button>
+      <p class="tiny muted">Take a picture of just this item — and of any mark, tag or label.</p>
+    </div>` : ""}
+    ${guessBlock}
+    ${showActions ? `<div class="stack sl-secondary">
       <button type="button" class="btn soft" data-act="haggle" data-id="${esc(it.id || "")}">💬 Help me haggle</button>
+      <p class="tiny muted">This is a first guess. Best used after you check it up close — you can still use it now.</p>
+      ${listItButton(it)}
       <button type="button" class="btn ghost" data-act="dismiss" data-id="${esc(it.id || "")}">Not interested</button>
     </div>` : ""}
   </article>`;
@@ -699,7 +951,7 @@ export function haggleSheetHtml(item, { bundle } = {}) {
         <div class="card stat"><span class="tiny muted">Fair price</span><b>${esc(formatUsd(h.fair))}</b></div>
         <div class="card stat"><span class="tiny muted">Walk away</span><b>${esc(formatUsd(h.walkAway))}</b></div>
       </div>`
-    : `<p class="small">There isn't enough of an estimate yet to suggest a number. Take a close-up first, then come back.</p>`;
+    : `<p class="small">There isn't enough of an estimate yet to suggest a number. Go check this one up close, then come back.</p>`;
   const lineRows = lines.map((ln, i) => `<div class="sl-line">
     <p>${esc(ln)}</p>
     <button type="button" class="btn sm soft" data-act="copyline" data-i="${i}">Copy</button>
@@ -712,9 +964,13 @@ export function haggleSheetHtml(item, { bundle } = {}) {
         <button type="button" class="btn sm soft" data-act="copybundle">Copy this line</button>
       </div>`
     : "";
+  const guessNote = item && item.checked
+    ? `<p class="small" id="sl-haggle-status">${honesty("ok", "Checked")} These numbers are from your close-up. Prices are still estimates — check them yourself.</p>`
+    : `<p class="small attn" id="sl-haggle-guess">This is a first guess from the table. Check it up close for a better number. You can still use these lines if you want.</p>`;
   return `<div class="sl-haggle" id="sl-haggle">
     <div class="row between"><h2>Help me haggle</h2>${honesty("warn", "Estimate")}</div>
     <p class="small muted">Based on the estimated resale, approximate fees and shipping, and the profit you want to keep. Check the numbers yourself. Be polite — never pushy or deceptive.</p>
+    ${guessNote}
     ${item && item.name ? `<p class="small"><b>${esc(item.name)}</b>${item.buyUpToLabel ? " · " + esc(item.buyUpToLabel) : ""}</p>` : ""}
     ${nums}
     <p class="tiny muted" id="sl-earbud-note" style="margin:10px 0 0">${honesty("later", "Coming later")} Coach me in my earbud. Use the lines below for now.</p>
@@ -754,7 +1010,16 @@ export function normalizeScan(raw, at = Date.now()) {
       dismissed: !!(src && src.dismissed),
       buyUpTo: src && src.buyUpTo != null ? money(src.buyUpTo) : it.buyUpTo,
       buyUpToLabel: (src && src.buyUpToLabel) || it.buyUpToLabel || "",
-      haggle: (src && src.haggle) || it.haggle || null
+      haggle: (src && src.haggle) || it.haggle || null,
+      checked: !!(src && src.checked),
+      checkedAt: (src && src.checkedAt) || it.checkedAt || null,
+      firstGuess: normalizeFirstGuess((src && src.firstGuess) || it.firstGuess),
+      verified: normalizeVerified((src && src.verified) || it.verified),
+      closeupPhotos: normalizeCloseupPhotos((src && src.closeupPhotos) || it.closeupPhotos),
+      closeupDraft: (src && src.closeupDraft) || it.closeupDraft || null,
+      listedItemId: String((src && src.listedItemId) || it.listedItemId || ""),
+      listNowAt: (src && src.listNowAt) || it.listNowAt || null,
+      condition: (src && src.condition) || it.condition || ""
     };
   });
   return {
@@ -801,7 +1066,7 @@ function writeScans(scans, storage) {
     try {
       const trimmed = list.map((sc, i) => {
         if (i < 8) return sc;
-        return { ...sc, items: (sc.items || []).map(it => ({ ...it, thumbDataUrl: "" })), coverThumb: "" };
+        return { ...sc, items: (sc.items || []).map(it => ({ ...it, thumbDataUrl: "", closeupPhotos: [] })), coverThumb: "" };
       });
       s.setItem(SCANS_KEY, dump(trimmed));
       return true;
@@ -809,7 +1074,7 @@ function writeScans(scans, storage) {
       try {
         s.setItem(SCANS_KEY, dump(list.slice(0, 5).map(sc => ({
           ...sc,
-          items: (sc.items || []).map(it => ({ ...it, thumbDataUrl: "" })),
+          items: (sc.items || []).map(it => ({ ...it, thumbDataUrl: "", closeupPhotos: [] })),
           coverThumb: ""
         }))));
         return true;

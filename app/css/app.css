@@ -408,3 +408,16 @@ body.terms-open #ask-fab{visibility:hidden;pointer-events:none}
 body.sl-banner-on #view{padding-top:calc(var(--sat) + var(--headh) + 12px + 48px)}
 body.intro-open #sl-chrome,
 body.terms-open #sl-chrome{display:none}
+
+.sl-steps{margin:12px 0 4px;padding:0 0 0 1.4em;font-size:1.06rem}
+.sl-steps li{margin:0 0 10px;padding-left:4px}
+.sl-steps ul{margin:6px 0 0;padding-left:1.1em}
+.sl-steps-lg{font-size:1.1rem}
+.sl-steps-lg li{margin-bottom:16px}
+.sl-card-checked{border:2px solid color-mix(in srgb,var(--ok) 50%,var(--line))}
+.sl-guess{margin-top:14px}
+.sl-haggle-rec{color:var(--ok);font-weight:650}
+.sl-count{font-size:1.1rem;font-weight:750;margin:8px 0 4px}
+.sl-secondary{margin-top:12px;margin-bottom:4px}
+#sl-check .sl-thumb{max-height:180px}
+.sl-check-photos{margin-top:10px}

@@ -8,20 +8,23 @@ import {
   loadScans, getScan, saveScan, updateScan, dismissItem, markScanRead,
   removeScan, unreadScanCount,
   lookCardHtml, skippedHtml, haggleSheetHtml, bundleTip, decorateItem,
-  scanWorkFromLookItem, haggleLines, formatUsd
+  scanWorkFromLookItem, haggleLines, formatUsd,
+  runCloseupCheck, setItemOnScan, sortLookItems, checkedSummary, itemFromLookItem
 } from "../../core/secondlook.js";
 import { getSettings } from "../../core/settings.js";
 import { getEnabledIds } from "../../core/prefs.js";
+import { photoFromFile, MAX_PHOTOS } from "../../core/draft.js";
 
-export function renderSecondLook(ctx, el, scanId) {
-  paint(ctx, el, scanId);
+export function renderSecondLook(ctx, el, scanId, rest = []) {
+  paint(ctx, el, scanId, rest);
   if (el._slUnsub) { try { el._slUnsub(); } catch (e) {} }
   el._slUnsub = subscribeJob(() => {
-    // Only repaint if we're still on this screen.
+    // Only repaint if we're still on this screen, and not mid close-up.
     if (!el.isConnected) { try { el._slUnsub(); } catch (e) {} return; }
-    const { head } = parseHead();
-    if (head !== "secondlook") return;
-    paint(ctx, el, currentScanId());
+    const cur = currentRoute();
+    if (cur.head !== "secondlook") return;
+    if (cur.action === "check") return;
+    paint(ctx, el, cur.scanId, cur.rest);
   });
 }
 
@@ -32,11 +35,28 @@ function parseHead() {
 }
 
 function currentScanId() {
-  const { head, rest } = parseHead();
-  return head === "secondlook" ? (rest[0] || "") : "";
+  return currentRoute().scanId;
 }
 
-function paint(ctx, el, scanId) {
+function currentRoute() {
+  const { head, rest } = parseHead();
+  return {
+    head: head || "home",
+    rest,
+    scanId: head === "secondlook" ? (rest[0] || "") : "",
+    action: head === "secondlook" ? (rest[1] || "") : "",
+    itemId: head === "secondlook" ? (rest[2] || "") : ""
+  };
+}
+
+function paint(ctx, el, scanId, rest = []) {
+  const route = currentRoute();
+  const action = (rest && rest[1]) || route.action;
+  const itemId = (rest && rest[2]) || route.itemId;
+  if (scanId && action === "check" && itemId) {
+    paintCheck(ctx, el, scanId, itemId);
+    return;
+  }
   const job = getJob();
   const id = scanId || (job.status === "done" && job.scanId) || "";
   const scan = id ? getScan(id) : null;
@@ -167,8 +187,10 @@ function decorateScan(scan) {
 
 function paintResults(ctx, el, rawScan, job) {
   const scan = decorateScan(rawScan);
-  const open = (scan.items || []).filter(it => !it.dismissed);
+  const ordered = sortLookItems(scan.items);
+  const open = ordered.filter(it => !it.dismissed);
   const dismissed = (scan.items || []).filter(it => it.dismissed);
+  const summary = checkedSummary(scan.items);
   const when = formatWhen(scan.createdAt);
   const cards = open.map(it => lookCardHtml(it)).join("");
   const empty = !open.length
@@ -178,10 +200,11 @@ function paintResults(ctx, el, rawScan, job) {
     ${top("Second look")}
     <div class="card flat" id="sl-results-head">
       <div class="row between"><h3>Worth a closer look</h3>${honesty("warn", "Estimate")}</div>
+      <p class="sl-count" id="sl-checked-count">${esc(summary.label)}</p>
       <p class="small muted">${esc(when)} · ${scan.kind === "video" ? "From a video" : "From a photo"}${scan.frameCount ? ` · ${scan.frameCount} still${scan.frameCount === 1 ? "" : "s"}` : ""}</p>
       ${scan.warning ? `<p class="small">${esc(scan.warning)}</p>` : ""}
       ${job && job.status === "running" ? `<p class="small">${esc(job.progress || "Looking… you can keep shopping")}</p><div class="sl-progress"><span></span></div>` : ""}
-      <p class="tiny muted">These are AI guesses from a distance. Check each one yourself.</p>
+      <p class="tiny muted">First guesses from the table. Go check each one up close, then use the price and Help me haggle.</p>
     </div>
     <div id="sl-cards">${cards || empty}</div>
     ${dismissed.length ? `<details class="more-block" id="sl-dismissed" style="margin-top:14px"><summary>Not interested (${dismissed.length})</summary>
@@ -201,6 +224,7 @@ function paintResults(ctx, el, rawScan, job) {
   bind(el, {
     closeup: b => takeCloseup(ctx, scan, b.dataset.id),
     haggle: b => openHaggle(ctx, el, scan, b.dataset.id),
+    listit: b => listIt(ctx, scan, b.dataset.id),
     dismiss: b => {
       const next = dismissItem(scan.id, b.dataset.id, true);
       toast("Okay, hidden. You can put it back if you change your mind.");
@@ -222,9 +246,158 @@ function paintResults(ctx, el, rawScan, job) {
 function takeCloseup(ctx, scan, itemId) {
   const item = (scan.items || []).find(it => it.id === itemId);
   if (!item) { toast("That item isn't here any more."); return; }
-  ctx.scanWork = scanWorkFromLookItem(item);
-  toast("Take a close-up, then tap Identify and check. The guess is already filled in.");
-  ctx.go("#/scan");
+  if (!ctx.slCheck || ctx.slCheck.scanId !== scan.id || ctx.slCheck.itemId !== itemId) {
+    ctx.slCheck = { scanId: scan.id, itemId, photos: [], busy: false, error: "" };
+  }
+  ctx.go("#/secondlook/" + scan.id + "/check/" + itemId);
+}
+
+
+async function listIt(ctx, scan, itemId) {
+  const item = (scan.items || []).find(it => it.id === itemId);
+  if (!item) { toast("That item isn't here any more."); return; }
+  if (item.listedItemId && ctx.items) {
+    const existing = ctx.items.find(i => i.id === item.listedItemId);
+    if (existing) { ctx.go("#/item/" + existing.id); return; }
+  }
+  if (typeof ctx.save !== "function") {
+    toast("Couldn't save the listing. Try again from Add an item.");
+    return;
+  }
+  try {
+    const inv = itemFromLookItem(item, { scanId: scan.id });
+    if (!inv.title && !(inv.photos || []).length) {
+      toast("There's nothing to list yet.");
+      return;
+    }
+    const saved = await ctx.save(inv);
+    setItemOnScan(scan.id, { ...item, listedItemId: saved.id, listNowAt: Date.now() });
+    toast("Saved to your items.");
+    ctx.go("#/item/" + saved.id);
+  } catch (e) {
+    toast((e && e.message) || "Couldn't start the listing. Try again.");
+  }
+}
+
+function paintCheck(ctx, el, scanId, itemId) {
+  const scan = decorateScan(getScan(scanId) || {});
+  const item = (scan.items || []).find(it => it.id === itemId);
+  if (!item) {
+    toast("That item isn't here any more.");
+    ctx.go("#/secondlook/" + scanId);
+    return;
+  }
+  if (!ctx.slCheck || ctx.slCheck.itemId !== itemId || ctx.slCheck.scanId !== scanId) {
+    ctx.slCheck = { scanId, itemId, photos: [], busy: false, error: "" };
+  }
+  const w = ctx.slCheck;
+  const photos = w.photos || [];
+  const checks = (item.whatToCheck || []).map(c => `<li>${esc(c)}</li>`).join("");
+  const thumbs = photos.map((p, i) => `<div class="photo sl-check-thumb">
+      <img src="${esc(p.dataUrl)}" alt="Close-up ${i + 1}">
+      ${w.busy ? "" : `<button type="button" class="x" data-act="rmphoto" data-i="${i}" aria-label="Remove photo">×</button>`}
+    </div>`).join("");
+  el.innerHTML = `
+    ${top("Go check this one", "#/secondlook/" + scanId)}
+    <div class="card" id="sl-check">
+      <div class="row between wrap"><h3>${esc(item.name)}</h3>${honesty("ok", "Working")}</div>
+      <p class="small muted">Walk back to it, look it over, then take a picture of just this item.</p>
+      <ol class="sl-steps sl-steps-lg">
+        <li>
+          <b>Find it.</b>
+          <p>${esc(item.where || "on the table")}</p>
+          ${item.thumbDataUrl ? `<img class="sl-thumb" src="${esc(item.thumbDataUrl)}" alt="From the table scan">` : ""}
+        </li>
+        <li>
+          <b>Check.</b>
+          ${checks ? `<ul>${checks}</ul>` : `<p>Look for marks, tags, labels, and condition.</p>`}
+        </li>
+        <li>
+          <b>Snap a close photo</b> of just this item, and of any mark, tag or label.
+          <div class="photos sl-check-photos" id="sl-check-photos">${thumbs}</div>
+          ${photos.length < MAX_PHOTOS && !w.busy ? `
+            <div class="stack sl-start-actions" style="margin-top:10px">
+              <label class="btn btn-main sl-filebtn">
+                <input id="sl-check-cam" type="file" accept="image/*" capture="environment" hidden>
+                📷 Take a picture of just this item
+              </label>
+              <label class="btn soft sl-filebtn">
+                <input id="sl-check-lib" type="file" accept="image/*" multiple hidden>
+                Add a photo of a mark, tag or label
+              </label>
+            </div>` : ""}
+        </li>
+      </ol>
+      <div class="stack" style="margin-top:14px">
+        <button type="button" class="btn btn-main" data-act="runcloseup" ${w.busy || !photos.length ? "disabled" : ""}>${w.busy ? "Looking at your close-up…" : "Use this close-up"}</button>
+        ${!photos.length
+          ? `<p class="tiny muted">Take a picture first, then we'll look it over and come back to the card.</p>`
+          : `<p class="tiny muted">We'll look at this close-up, then mark the card Checked with the verified result.</p>`}
+        ${!hasKey() ? keyNote() : ""}
+        ${w.error ? `<p class="attn" id="sl-check-error">${esc(w.error)}</p>` : ""}
+      </div>
+      ${privacy()}
+    </div>
+  `;
+  bind(el, {
+    runcloseup: () => runAndReturn(ctx, el, scan, item),
+    rmphoto: b => {
+      const i = +b.dataset.i;
+      w.photos = (w.photos || []).filter((_, idx) => idx !== i);
+      paintCheck(ctx, el, scanId, itemId);
+    }
+  });
+  const addFiles = async input => {
+    const files = input.files ? Array.from(input.files) : [];
+    input.value = "";
+    for (const f of files) {
+      if ((w.photos || []).length >= MAX_PHOTOS) break;
+      try {
+        const photo = await photoFromFile(f);
+        w.photos = [...(w.photos || []), photo];
+      } catch (e) {
+        toast("That photo couldn't be added. Try another.");
+      }
+    }
+    paintCheck(ctx, el, scanId, itemId);
+  };
+  const cam = el.querySelector("#sl-check-cam");
+  const lib = el.querySelector("#sl-check-lib");
+  if (cam) cam.addEventListener("change", () => addFiles(cam));
+  if (lib) lib.addEventListener("change", () => addFiles(lib));
+}
+
+async function runAndReturn(ctx, el, scan, item) {
+  const w = ctx.slCheck;
+  if (!w || !(w.photos || []).length) {
+    toast("Take a picture of just this item first.");
+    return;
+  }
+  if (!hasKey()) {
+    toast(MSG_NO_KEY);
+    ctx.go("#/settings");
+    return;
+  }
+  w.busy = true;
+  w.error = "";
+  paintCheck(ctx, el, scan.id, item.id);
+  try {
+    const settings = getSettings();
+    const updated = await runCloseupCheck(item, {
+      photos: w.photos,
+      enabledSites: getEnabledIds(),
+      desiredProfit: settings.desiredProfit
+    });
+    setItemOnScan(scan.id, updated);
+    ctx.slCheck = null;
+    toast("Checked. The close-up replaced the first guess.");
+    ctx.go("#/secondlook/" + scan.id);
+  } catch (e) {
+    w.busy = false;
+    w.error = (e && e.message) || "The close-up couldn't be checked. Try again.";
+    toast(w.error);
+    paintCheck(ctx, el, scan.id, item.id);
+  }
 }
 
 function openHaggle(ctx, el, scan, itemId) {
