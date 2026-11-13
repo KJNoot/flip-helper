@@ -23,7 +23,7 @@ import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.j
 import { shouldShowTermsGate, rememberInviteIfValid } from "./core/invite.js";
 import { openTerms, closeTerms, isTermsOpen } from "./ui/terms.js";
 
-export const VERSION = "0.7.4";
+export const VERSION = "0.8.0";
 
 const view = $("#view");
 const store = await createStore();
@@ -40,9 +40,10 @@ const ctx = {
     const row = await store.put(normalizeItem(item));
     await ctx.reload();
     updateChrome();
+    queueSync();
     return row;
   },
-  async remove(id) { await store.remove(id); await ctx.reload(); updateChrome(); },
+  async remove(id) { await store.remove(id); await ctx.reload(); updateChrome(); queueSync(); },
   async reload() {
     ctx.items = await store.all();
     return ctx.items;
@@ -199,9 +200,44 @@ function afterIntro() {
   }
 }
 
+
+// Quiet background sync when this device is signed in. Does not change
+// any existing screen for someone who has not turned sync on. A pull
+// refreshes the list only when we are not in the middle of Settings.
+let _syncTimer = 0;
+function queueSync() {
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => { maybeSync({ renderAfter: true }); }, 400);
+}
+async function maybeSync({ renderAfter = false } = {}) {
+  try {
+    const { currentUser, runSync } = await import("./core/sync.js");
+    const user = await currentUser();
+    if (!user) return null;
+    const r = await runSync({
+      store,
+      loadScans: () => loadScans(),
+      saveScan: s => saveScan(s),
+      removeScan: id => removeScan(id)
+    });
+    if (r && r.ok && r.pulled > 0 && renderAfter) {
+      await ctx.reload();
+      if (ctx.screen !== "Settings") ctx.render();
+      updateChrome();
+    }
+    return r;
+  } catch (e) {
+    return null;
+  }
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") queueSync();
+});
+
 render();
 tickReminders();
 mountSecondLookBanner(ctx);
+queueSync();
 
 // First-open: private invite may show terms first, then the welcome video
 // and try-it demo, then the short tips. Public visits (no token) skip terms.
@@ -257,6 +293,7 @@ window.__flip = {
   render,
   tickReminders,
   get scanWork() { return ctx.scanWork; },
+  runSync: () => maybeSync({ renderAfter: true }),
   setScan(w) { ctx.scanWork = w; },
   get secondLookJob() { return getSecondLookJob(); },
   getScans: () => loadScans(),
