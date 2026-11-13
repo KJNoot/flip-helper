@@ -19,7 +19,7 @@ import { openWalkthrough } from "./ui/walkthrough.js";
 import { shouldShowIntro } from "./core/intro.js";
 import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.js";
 
-export const VERSION = "0.4.0";
+export const VERSION = "0.4.1";
 
 const view = $("#view");
 const store = await createStore();
