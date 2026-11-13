@@ -47,13 +47,25 @@ export function defaultIrsRate(at = Date.now()) {
   return irsBandForDate(at).rate;
 }
 
+export const DEFAULT_PROFIT_FLOOR = 5;
+export const DEFAULT_DESIRED_PROFIT = 10;
+
 export const DEFAULT_SETTINGS = {
   dropAfterDays: DEFAULT_DROP_DAYS,
   // null means: use the official IRS rate for each trip's date
   irsMileageRate: null,
   notifyDelist: false,
-  ebayOfficialComps: false
+  ebayOfficialComps: false,
+  defaultProfitFloor: DEFAULT_PROFIT_FLOOR,
+  desiredProfit: DEFAULT_DESIRED_PROFIT,
+  pauseAutomation: false,
+  boxes: []
 };
+
+export const PAUSE_NOTE_ON = "Reminders and notifications are paused. Automatic listing and take-down (coming later) will also pause here.";
+export const PAUSE_NOTE_OFF = "Reminders can run. There is no automatic posting in this version. When official take-down is added, this same switch will pause it.";
+export const NO_SUBSCRIPTION_NOTE = "There's no subscription in this test version. You have the complete app. Nothing essential is locked behind an upgrade.";
+
 
 function store(injected) {
   if (injected) return injected;
@@ -74,11 +86,17 @@ export function getSettings(storage) {
 export function normalizeSettings(raw = {}) {
   const drop = Number(raw.dropAfterDays);
   const rate = raw.irsMileageRate == null || raw.irsMileageRate === "" ? null : mileRate(raw.irsMileageRate);
+  const floor = money(raw.defaultProfitFloor);
+  const desired = money(raw.desiredProfit);
   return {
     dropAfterDays: Number.isFinite(drop) && drop >= 1 && drop <= 365 ? Math.round(drop) : DEFAULT_DROP_DAYS,
     irsMileageRate: rate != null && rate >= 0 && rate <= 10 ? rate : null,
     notifyDelist: !!raw.notifyDelist,
-    ebayOfficialComps: !!raw.ebayOfficialComps
+    ebayOfficialComps: !!raw.ebayOfficialComps,
+    defaultProfitFloor: floor != null && floor >= 0 && floor <= 10000 ? floor : DEFAULT_PROFIT_FLOOR,
+    desiredProfit: desired != null && desired >= 0 && desired <= 10000 ? desired : DEFAULT_DESIRED_PROFIT,
+    pauseAutomation: !!raw.pauseAutomation,
+    boxes: normalizeBoxes(raw.boxes)
   };
 }
 
@@ -123,6 +141,32 @@ export function newTripId(at = Date.now()) {
   return "mi_" + at.toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+export function newBoxId(at = Date.now()) {
+  return "bx_" + at.toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+export function normalizeBox(raw = {}, at = Date.now()) {
+  if (!raw || typeof raw !== "object") return null;
+  const l = Number(raw.lengthIn ?? raw.l);
+  const w = Number(raw.widthIn ?? raw.w);
+  const h = Number(raw.heightIn ?? raw.h);
+  const label = String(raw.label || "").trim();
+  if (!label && !(l > 0) && !(w > 0) && !(h > 0)) return null;
+  return {
+    id: String(raw.id || newBoxId(at)),
+    label: label || "Box",
+    lengthIn: Number.isFinite(l) && l > 0 ? l : null,
+    widthIn: Number.isFinite(w) && w > 0 ? w : null,
+    heightIn: Number.isFinite(h) && h > 0 ? h : null
+  };
+}
+
+export function normalizeBoxes(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw.map(b => normalizeBox(b)).filter(Boolean);
+}
+
+
 export function normalizeTrip(raw = {}, at = Date.now()) {
   const date = String(raw.date || ymd(raw.at || at));
   const miles = money(raw.miles);
@@ -136,6 +180,7 @@ export function normalizeTrip(raw = {}, at = Date.now()) {
     rate,
     rateSource: String(raw.rateSource || ""),
     deduction,
+    itemId: raw.itemId ? String(raw.itemId) : "",
     at: raw.at || at
   };
 }

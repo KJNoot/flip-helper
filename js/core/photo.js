@@ -6,7 +6,7 @@
 // Uint8ClampedArray or a plain array, so they can be unit-tested in Node.
 
 export const PHOTO_CLEANUP_LABEL = "basic";
-export const PHOTO_CLEANUP_NOTE = "A basic clean-up on this phone: brighter, a bit more contrast, cropped square, and an optional plain background. It is not a studio cut-out.";
+export const PHOTO_CLEANUP_NOTE = "A basic clean-up on this phone: brighter, a bit more contrast, cropped square, and an optional plain background. It does not hide damage, and it does not blur or smooth the photo. Check that flaws are still visible. It is not a studio cut-out.";
 
 function asBytes(data) {
   return data instanceof Uint8ClampedArray ? data : Uint8ClampedArray.from(data);

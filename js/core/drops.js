@@ -2,7 +2,9 @@
 // She approves each one. The app does not change the live listing on a site.
 import { money, formatUsd, listedSiteIds, firstListedAt, siteName } from "./inventory.js";
 import { isKnownSite } from "./sites.js";
-import { DEFAULT_DROP_DAYS } from "./settings.js";
+import { DEFAULT_DROP_DAYS, DEFAULT_PROFIT_FLOOR } from "./settings.js";
+import { askingFloor } from "./profit.js";
+import { feeFor } from "./fees.js";
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -38,15 +40,25 @@ function alreadyHandled(item, siteId, at) {
   return recent.some(h => h.status === "approved" || h.status === "dismissed" || h.status === "updated");
 }
 
-function suggestedPrice(item, percent) {
+function suggestedPrice(item, percent, { defaultFloor = DEFAULT_PROFIT_FLOOR } = {}) {
   const current = money(item.askingPrice);
   if (current == null || current <= 0) return null;
   let to = money(current * (1 - percent / 100));
-  const floor = money(item.priceLow);
+  const low = money(item.priceLow);
+  if (low != null && to < low) to = low;
+  // Never go below her profit floor (per item, or the default in Settings).
+  // Use a fee estimate for the first listed site when we can.
+  const firstSite = ((item.listedOn && Object.keys(item.listedOn)[0]) || item.soldOn || "ebay");
+  const feeEst = firstSite && current != null ? (feeFor(firstSite, current).fee ?? 0) : 0;
+  const shipEst = money(item.actualShipCost) ?? money(item.shippingPaid) ?? 0;
+  const floor = askingFloor(item, { defaultFloor, feeEstimate: 0, shipEstimate: shipEst });
+  // Fee estimate is approximate and based on the current asking price; using
+  // it as a hard floor can push the floor above the current price. The profit
+  // floor is cost + shipping + desired profit. Fees are a reminder, not a second floor.
+  void feeEst;
   if (floor != null && to < floor) to = floor;
-  // Don't go below about cost plus a little breathing room if we know cost.
   const cost = money(item.costPaid);
-  if (cost != null && to < cost) to = money(Math.max(cost, floor ?? 0)) || to;
+  if (cost != null && to < cost) to = money(Math.max(cost, floor ?? low ?? 0)) || to;
   if (to == null || to >= current) return null;
   return to;
 }
@@ -67,14 +79,14 @@ export function reasonFor({ siteId, days, fromPrice, toPrice, percent, action })
  * Per-site suggestions for one item. Empty if it is not yet stale, already
  * sold, has no asking price, or was just handled.
  */
-export function suggestionsForItem(item, { days = DEFAULT_DROP_DAYS, at = Date.now() } = {}) {
+export function suggestionsForItem(item, { days = DEFAULT_DROP_DAYS, at = Date.now(), defaultFloor = DEFAULT_PROFIT_FLOOR } = {}) {
   if (!item || item.soldAt) return [];
   const ids = listedSiteIds(item);
   if (!ids.length) return [];
   const age = daysListed(item, at);
   if (age < days) return [];
   const percent = dropPercent(age, days);
-  const to = suggestedPrice(item, percent);
+  const to = suggestedPrice(item, percent, { defaultFloor });
   if (to == null) return [];
   const from = money(item.askingPrice);
   const out = [];
@@ -148,3 +160,9 @@ export function pendingPriceUpdates(item) {
 }
 
 export { money, formatUsd, siteName, DEFAULT_DROP_DAYS };
+
+/** The asking-price floor a drop will not go below. */
+export function dropFloor(item, { defaultFloor = DEFAULT_PROFIT_FLOOR } = {}) {
+  const shipEst = money(item && item.actualShipCost) ?? money(item && item.shippingPaid) ?? 0;
+  return askingFloor(item, { defaultFloor, feeEstimate: 0, shipEstimate: shipEst });
+}

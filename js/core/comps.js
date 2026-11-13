@@ -93,15 +93,37 @@ export function soldLinks(item, enabledIds) {
   return { query: q, links };
 }
 
+export const NO_SOLD_DATA = "No sold data yet";
+
 export function normalizeLoggedComp(raw = {}, at = Date.now()) {
   return {
     id: raw.id || ("cp_" + at.toString(36) + Math.random().toString(36).slice(2, 6)),
     price: money(raw.price),
     siteId: isKnownSite(raw.siteId) ? raw.siteId : (raw.siteId ? String(raw.siteId) : ""),
     note: String(raw.note || "").trim(),
+    date: String(raw.date || "").trim(),
+    condition: String(raw.condition || "").trim(),
+    confidence: String(raw.confidence || "").trim(),
     at: raw.at || at
   };
 }
+
+/** True when there is no logged sold example and no official sold data. AI estimates do not count as sold data. */
+export function hasSoldData(item) {
+  const logged = item && item.comps && Array.isArray(item.comps.logged)
+    ? item.comps.logged.filter(c => c && c.price != null)
+    : [];
+  const official = item && item.comps && Array.isArray(item.comps.official)
+    ? item.comps.official.filter(c => c && c.price != null)
+    : [];
+  return logged.length + official.length > 0;
+}
+
+export function soldDataMessage(item) {
+  if (hasSoldData(item)) return "";
+  return NO_SOLD_DATA;
+}
+
 
 export function addLoggedComp(item, raw, at = Date.now()) {
   const comp = normalizeLoggedComp(raw, at);

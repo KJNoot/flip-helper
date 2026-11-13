@@ -51,7 +51,7 @@ function row(item) {
       ${thumb(item)}
       <span class="grow">
         <b class="clamp2">${esc(item.title || "Untitled item")}</b>
-        <span class="tiny muted">${extra}</span>
+        <span class="tiny muted">${extra}${item.binLocation ? " · Bin " + esc(item.binLocation) : ""}</span>
       </span>
       <span class="tiny muted price">${esc(price)}</span>
     </a>

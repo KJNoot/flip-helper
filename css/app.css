@@ -209,3 +209,55 @@ h4{margin:0 0 6px;font-size:.95rem}
   .tabs a{font-size:.6rem}
   .tab-badge{right:calc(50% - 18px)}
 }
+
+/* v0.3.0: Ask helper, walkthrough, tips, simplicity, pricing, QR, pause, morning */
+.btn-main{font-size:1.12rem;min-height:58px;box-shadow:0 6px 18px color-mix(in srgb,var(--a1) 45%,transparent)}
+.tip-btn{appearance:none;display:inline-grid;place-items:center;width:28px;height:28px;margin-left:6px;border:0;border-radius:50%;background:color-mix(in srgb,var(--a1) 16%,var(--card));color:var(--a1);font-weight:800;font-size:.85rem;cursor:pointer;vertical-align:middle;line-height:1}
+.tip-btn:active{transform:scale(.94)}
+.field-with-act{display:flex;gap:8px;align-items:flex-start}
+.field-with-act input,.field-with-act textarea{flex:1}
+.field-with-act .btn{width:auto;flex:0 0 auto}
+details.more-block{margin-top:12px;border:1px solid var(--line);border-radius:14px;padding:0 14px 8px;background:var(--card)}
+details.more-block>summary{cursor:pointer;min-height:48px;display:flex;align-items:center;font-weight:700;color:var(--a1)}
+details.more-block[open]>summary{border-bottom:1px solid var(--line);margin-bottom:10px}
+
+.ask-fab{position:fixed;right:14px;bottom:calc(var(--tabh) + var(--sab) + 14px);z-index:15;appearance:none;border:0;border-radius:28px;background:var(--a1);color:#fff;font-weight:800;font-size:.95rem;min-height:56px;padding:10px 16px 10px 12px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 24px color-mix(in srgb,var(--a1) 50%,transparent);cursor:pointer;max-width:calc(100vw - 28px)}
+.ask-fab:active{transform:scale(.97)}
+.ask-fab-icon{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.2);font-weight:900}
+.ask-fab-label{white-space:nowrap}
+.ask-sheet{display:flex;flex-direction:column;max-height:88dvh}
+.ask-log{flex:1;min-height:140px;max-height:42dvh;overflow:auto;margin:8px 0 12px;padding:4px}
+.ask-bubble{border-radius:16px;padding:10px 12px;margin:0 0 8px;max-width:92%}
+.ask-bubble.user{background:color-mix(in srgb,var(--a1) 16%,var(--card));margin-left:auto}
+.ask-bubble.assistant{background:var(--soft)}
+.ask-form textarea{width:100%}
+.walk-sheet h2{font-size:1.4rem;margin-top:4px}
+.walk-sheet p{font-size:1.05rem}
+
+.pricing-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:10px}
+@media (min-width:520px){.pricing-grid{grid-template-columns:1fr 1fr 1fr}}
+.price-option{border:2px solid var(--line);border-radius:16px;padding:12px;background:var(--card)}
+.price-option.on{border-color:var(--a1);background:color-mix(in srgb,var(--a1) 8%,var(--card))}
+.price-option .big-num{margin:4px 0}
+.qr-block{margin-top:10px;text-align:center}
+.qr-svg{display:inline-block;background:#fff;padding:8px;border-radius:12px;line-height:0}
+.qr-svg svg{display:block;max-width:180px;height:auto;margin:0 auto}
+.status-list{list-style:none;padding:0;margin:8px 0 0}
+.status-list li{padding:12px 0;border-top:1px solid var(--line)}
+.status-list li:first-child{border-top:0;padding-top:0}
+.pill-live,.pill-pending{background:color-mix(in srgb,var(--a1) 16%,var(--card));color:var(--a1)}
+.pill-removed,.pill-draft{background:var(--soft);color:var(--muted)}
+.pill-failed,.pill-needsManual{background:var(--attnbg);color:var(--attn)}
+.pill-sold{background:color-mix(in srgb,var(--ok) 16%,var(--card));color:var(--ok)}
+#pause-banner,#morning,#buy-up-to,#pricing,#sitestatus,#honesty,#mistakes{scroll-margin-top:calc(var(--sat) + var(--headh) + 12px)}
+.switch-row{font-size:1.05rem}
+.compat-row h3{margin-bottom:6px}
+#view{padding-bottom:calc(var(--tabh) + var(--sab) + 88px)}
+.dictate-btn{width:auto}
+.mistakes-list{list-style:none;padding:0;margin:8px 0 0}
+.mistakes-list li{padding:8px 0;border-top:1px solid var(--line)}
+.honesty-split-card .confirm-row{margin:8px 0}
+@media (max-width:360px){
+  .ask-fab-label{font-size:.82rem}
+  .ask-fab{padding:10px 12px 10px 10px}
+}

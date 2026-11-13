@@ -4,6 +4,7 @@ import { money, formatUsd, emptyItem } from "./inventory.js";
 import { feeFor } from "./fees.js";
 import { defaultShippingCost, heuristicShip, normalizeShipSuggest, shippingEstimates } from "./shipping.js";
 import { isKnownSite, knownSiteIds, siteName } from "./sites.js";
+import { buyUpTo, buyUpToLabel } from "./profit.js";
 
 export const VERDICTS = ["buy", "maybe", "pass"];
 export const VERDICT_LABELS = { buy: "Buy", maybe: "Maybe", pass: "Pass" };
@@ -55,7 +56,9 @@ export function scanResult({
   siteIds,
   weightOz,
   costPaid,
-  shippingOverride
+  shippingOverride,
+  desiredProfit,
+  feeOverride
 } = {}) {
   const ask = money(asking);
   const low = money(resaleLow);
@@ -96,6 +99,18 @@ export function scanResult({
   const verdict = ask == null || mid == null ? "maybe" : verdictFromProfit({ netLow, netMid, asking: ask });
   const shipEstimates = shippingEstimates(weightOz || 16);
 
+  const feeMid = best && best.feeMid != null ? best.feeMid : null;
+  const shipForBuy = best ? best.shipping : shipDefault;
+  const usedFee = feeOverride != null ? money(feeOverride) : feeMid;
+  const usedShip = shippingOverride != null ? money(shippingOverride) : shipForBuy;
+  const usedResale = mid;
+  const usedDesired = money(desiredProfit) ?? 0;
+  const buy = buyUpTo({
+    resale: usedResale,
+    fees: usedFee,
+    shipping: usedShip,
+    desiredProfit: usedDesired
+  });
   return {
     asking: ask,
     resaleLow: low,
@@ -111,7 +126,15 @@ export function scanResult({
     netHigh: best ? best.netHigh : null,
     verdict,
     verdictLabel: VERDICT_LABELS[verdict],
-    approx: true
+    approx: true,
+    buyUpTo: buy,
+    buyUpToLabel: buyUpToLabel(buy),
+    assumptions: {
+      resale: usedResale,
+      fees: usedFee,
+      shipping: usedShip,
+      desiredProfit: usedDesired
+    }
   };
 }
 
@@ -170,4 +193,4 @@ export function itemFromScan({ photos, draft, asking, result, notes } = {}, at =
   }, at);
 }
 
-export { money, formatUsd, feeFor, siteName, heuristicShip };
+export { money, formatUsd, feeFor, siteName, heuristicShip, buyUpTo, buyUpToLabel };
