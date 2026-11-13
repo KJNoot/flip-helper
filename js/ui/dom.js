@@ -140,18 +140,22 @@ export function bind(el, handlers) {
     const fn = handlers[b.dataset.act];
     if (fn) fn(b, e);
   };
-  el.addEventListener("click", e => {
+  if (el._flipBindClick) el.removeEventListener("click", el._flipBindClick);
+  if (el._flipBindChange) el.removeEventListener("change", el._flipBindChange);
+  el._flipBindClick = e => {
     const b = e.target.closest("[data-act]");
     if (!b || !el.contains(b)) return;
     if (b.tagName === "INPUT") return; // checkboxes fire on change so the new checked state is right
     e.preventDefault();
     run(e, b);
-  });
-  el.addEventListener("change", e => {
+  };
+  el._flipBindChange = e => {
     const b = e.target.closest("[data-act]");
     if (!b || !el.contains(b)) return;
     if (b.tagName === "INPUT") run(e, b);
-  });
+  };
+  el.addEventListener("click", el._flipBindClick);
+  el.addEventListener("change", el._flipBindChange);
 }
 
 export function thumb(item, size = 56) {

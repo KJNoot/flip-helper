@@ -15,7 +15,7 @@ function tweakBlock(s, tweaks) {
   </details>`;
 }
 
-export function fieldsHtml(item, { prefix = "", enabledIds } = {}) {
+export function fieldsHtml(item, { prefix = "", enabledIds, hideSearch = false } = {}) {
   const p = prefix;
   const tweaks = item.siteTweaks || {};
   const enabled = enabledIds || getEnabledIds();
@@ -51,7 +51,7 @@ export function fieldsHtml(item, { prefix = "", enabledIds } = {}) {
         <label class="field"><span>High</span><input id="${p}phigh" type="text" inputmode="decimal" value="${esc(item.priceHigh ?? "")}"></label>
       </div>
       <label class="field"><span>Why this range</span><textarea id="${p}preason" rows="2">${esc(item.priceReason)}</textarea></label>
-      ${searchLinks(item, enabled)}
+      ${hideSearch ? "" : searchLinks(item, enabled)}
     </div>
     <label class="field"><span>Your notes</span><textarea id="${p}notes" rows="2" placeholder="Anything you want to remember">${esc(item.notes)}</textarea></label>
     <h3 class="section-kicker">Per-site tweaks</h3>

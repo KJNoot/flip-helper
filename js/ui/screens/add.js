@@ -4,6 +4,7 @@ import { photoFromFile, requestDraft, applyDraft, MAX_PHOTOS } from "../../core/
 import { hasKey } from "../../core/key.js";
 import { fieldsHtml, readFields, adviceHtml } from "./form.js";
 import { getEnabledIds } from "../../core/prefs.js";
+import { openCleanup } from "../cleanup.js";
 
 export function renderAdd(ctx, el) {
   if (!ctx.work || ctx.work.saved) ctx.work = emptyWork();
@@ -40,6 +41,7 @@ function paint(ctx, el) {
             <span>🖼 Choose</span>
           </label>` : ""}
       </div>
+      ${photos.length ? `<button type="button" class="btn soft sm" data-act="cleanup" style="margin-top:10px">Clean up photos (basic)</button>` : ""}
     </div>
     <div class="card">
       <label class="field"><span>What you paid (optional)</span>
@@ -84,6 +86,20 @@ function paint(ctx, el) {
       const i = +b.dataset.i;
       ctx.work.item = { ...ctx.work.item, photos: (ctx.work.item.photos || []).filter((_, n) => n !== i) };
       paint(ctx, el);
+    },
+    cleanup: () => {
+      const first = (ctx.work.item.photos || [])[0];
+      if (!first) { toast("Take a photo first"); return; }
+      openCleanup({
+        dataUrl: first.dataUrl,
+        onApply: (dataUrl) => {
+          const photos = (ctx.work.item.photos || []).slice();
+          photos[0] = { ...photos[0], dataUrl, cleanedAt: Date.now(), cleaned: "basic" };
+          ctx.work.item = { ...ctx.work.item, photos };
+          toast("Photo cleaned up (basic)");
+          paint(ctx, el);
+        }
+      });
     },
     manual: () => {
       syncTop(ctx, el);

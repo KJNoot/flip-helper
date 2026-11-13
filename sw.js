@@ -1,7 +1,7 @@
 // Offline cache. Bump VERSION whenever any file changes so phones pick up the update.
-const VERSION = 'flip-helper-v0.1.0';
+const VERSION = 'flip-helper-v0.2.0';
 const OWN = 'flip-helper-';
-const ASSETS = ['./', 'index.html', 'css/app.css', 'manifest.webmanifest', 'icons/apple-touch-icon.png', 'icons/favicon-32.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'js/main.js', 'js/core/sites.js', 'js/core/inventory.js', 'js/core/key.js', 'js/core/prefs.js', 'js/core/draft.js', 'js/core/storage.js', 'js/ui/dom.js', 'js/ui/suggest.js', 'js/ui/screens/form.js', 'js/ui/screens/home.js', 'js/ui/screens/add.js', 'js/ui/screens/item.js', 'js/ui/screens/items.js', 'js/ui/screens/settings.js'];
+const ASSETS = ['./', 'index.html', 'css/app.css', 'manifest.webmanifest', 'icons/apple-touch-icon.png', 'icons/favicon-32.png', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/maskable-512.png', 'js/main.js', 'js/core/sites.js', 'js/core/inventory.js', 'js/core/key.js', 'js/core/prefs.js', 'js/core/draft.js', 'js/core/storage.js', 'js/core/fees.js', 'js/core/settings.js', 'js/core/taxes.js', 'js/core/protect.js', 'js/core/comps.js', 'js/core/drops.js', 'js/core/shipping.js', 'js/core/scanner.js', 'js/core/photo.js', 'js/ui/dom.js', 'js/ui/suggest.js', 'js/ui/cleanup.js', 'js/ui/screens/form.js', 'js/ui/screens/home.js', 'js/ui/screens/add.js', 'js/ui/screens/item.js', 'js/ui/screens/items.js', 'js/ui/screens/settings.js', 'js/ui/screens/scan.js', 'js/ui/screens/taxes.js'];
 // App shell: network first so an open gets the newest version when online,
 // with the cache as the offline fallback. Images: cache first.
 const SHELL_RE = /(\/|\.html|\.js|\.css|\.json|\.webmanifest)$/;
