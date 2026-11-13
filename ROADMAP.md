@@ -1,8 +1,8 @@
 # Jessika's Flip Side — roadmap to the full version
 
-This is the plan for later, after the tester has used the iPhone helper. Parts of v0.2 and v0.3 (the take-down checklist with reminders and a guided walk-through, sold-price links, fee tables, Buy or pass, Ask a question, and the rest of the complete phone app) are already in the phone app. Automatic take-down and official sold prices are not built yet, and nothing is promised for a date. The goal is the same one Ken described: she takes a photo, approves a draft, and the item is listed on her sites; when it sells on one, it comes down on the others. That has to be done in a way that is legal, official where official doors exist, and honest where they do not.
+This is the plan for later, after the tester has used the iPhone helper. Parts of v0.2, v0.3, and v0.4 (the take-down checklist with reminders and a guided walk-through, sold-price links, fee tables, Buy or pass, Ask a question, a first-open welcome and sandboxed “try it before you install” demo, and the rest of the complete phone app) are already in the phone app. Automatic take-down and official sold prices are not built yet, and nothing is promised for a date. The goal is the same one Ken described: she takes a photo, approves a draft, and the item is listed on her sites; when it sells on one, it comes down on the others. That has to be done in a way that is legal, official where official doors exist, and honest where they do not.
 
-v0.3 (this release) is the complete iPhone helper: photo, AI draft, Buy or pass, her approval, a tracker, a sold take-down checklist with a countdown, reminders, and a guided “Take them all down automatically” walk-through (today it flags Unavailable and opens each site; official automatic removal is still later), price-drop ideas that respect a profit floor, full profit and taxes, bins and QR labels, CSV import, an Ask-a-question helper, and a short first-run walkthrough. Nothing essential is locked behind an upgrade. Posting and taking listings down are still things she does herself, with a guided next-site flow. That is on purpose. Official automatic take-down is designed below and is not built yet.
+v0.4 (this release) is the complete iPhone helper, plus a first-open welcome and a try-it-before-you-install demo. v0.3 already was: photo, AI draft, Buy or pass, her approval, a tracker, a sold take-down checklist with a countdown, reminders, and a guided “Take them all down automatically” walk-through (today it flags Unavailable and opens each site; official automatic removal is still later), price-drop ideas that respect a profit floor, full profit and taxes, bins and QR labels, CSV import, an Ask-a-question helper, and a short first-run walkthrough. Nothing essential is locked behind an upgrade. Posting and taking listings down are still things she does herself, with a guided next-site flow. That is on purpose. Official automatic take-down is designed below and is not built yet.
 
 ## The gold standard, said plainly
 
@@ -75,7 +75,7 @@ Still later: official API take-down (eBay, Etsy, Shopify first), the computer he
 
 ## Order of work
 
-1. **v0.3, in testers' hands (this release).** iPhone web app. The complete helper described above, including guided take-down, Ask a question, and a simple first-run walkthrough. She picks which sites she sells on. We learn from her suggestions which sites she actually uses and what is missing.
+1. **v0.4, in testers' hands (this release).** iPhone web app. The complete helper described above, including a first-open welcome, a sandboxed try-it demo, guided take-down, Ask a question, and a simple first-run walkthrough. She picks which sites she sells on. We learn from her suggestions which sites she actually uses and what is missing.
 2. **Official eBay connection.** Ken's eBay developer account, her "Sign in with eBay" permission, then real list and take-down for eBay, labeled Working, and official sold prices through eBay's Marketplace Insights / Browse APIs (the adapter is already sketched in the app). Other sites stay "Needs you to post."
 3. **Official Etsy**, if Etsy grants Commercial Access (or a personal shop connection if that is all she needs). Same honest labeling.
 4. **Official Shopify**, only if she has a Shopify shop.
@@ -84,6 +84,11 @@ Still later: official API take-down (eBay, Etsy, Shopify first), the computer he
 7. **Polish from her suggestions.** Real shipping labels (a shipping service account), and Android / App Store packaging, as she and Ken ask for them.
 
 At every step, features stay labeled **Working**, **Estimate**, **Needs you to post**, or **Coming later**. We do not claim automatic take-down on a site we cannot legally and reliably reach.
+
+
+## Public demo with real AI for strangers (not built)
+
+A public “try it with your own photo” demo for people who do not have a key — for example a link Ken sends to strangers — would need a small server that holds the AI key, forwards photo-to-draft requests, and rate-limits them so a shared key cannot be run up. That has a monthly cost, and it needs Ken's approval. It is not built. Today's demo uses a real AI draft only when a key is already saved on the device, and otherwise a realistic sample draft labeled Sample.
 
 ## What we will not do
 

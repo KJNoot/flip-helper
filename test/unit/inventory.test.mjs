@@ -318,6 +318,25 @@ describe("draft parsing", () => {
     assert.equal(i.costPaid, 5);
     assert.equal(i.priceReason, "rough guess");
   });
+  it("normalizeDraft is idempotent: a second pass (Apply on an already-normalized draft) keeps siteAdvice", () => {
+    const raw = {
+      title: "Speckled mug",
+      bestPrice: { sites: ["ebay", "etsy"], reason: "Often brings more here." },
+      fastestSale: { sites: ["facebook", "mercari"], reason: "Can sell faster locally." }
+    };
+    const once = normalizeDraft(raw);
+    assert.deepEqual(once.siteAdvice.bestPrice.sites, ["ebay", "etsy"]);
+    assert.deepEqual(once.siteAdvice.fastestSale.sites, ["facebook", "mercari"]);
+    assert.match(once.siteAdvice.bestPrice.reason, /more/);
+    const twice = normalizeDraft(once);
+    assert.deepEqual(twice.siteAdvice, once.siteAdvice);
+    // This is the Apply path: requestDraft already normalized, applyDraft normalizes again.
+    const applied = applyDraft(item({ costPaid: 4 }), once);
+    assert.deepEqual(applied.siteAdvice.bestPrice.sites, ["ebay", "etsy"]);
+    assert.deepEqual(applied.siteAdvice.fastestSale.sites, ["facebook", "mercari"]);
+    assert.match(applied.siteAdvice.bestPrice.reason, /more/);
+    assert.match(applied.siteAdvice.fastestSale.reason, /faster/);
+  });
   it("maps API errors to plain language and never includes a key", () => {
     assert.match(friendlyApiError(401, "Incorrect API key"), /not accepted/);
     assert.match(friendlyApiError(429, ""), /busy|limit/);

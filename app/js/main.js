@@ -14,10 +14,12 @@ import { renderCompat } from "./ui/screens/compat.js";
 import { badgeCount, attentionItems, shouldRemind, reminderBody, delistCountdown } from "./core/protect.js";
 import { getSettings, setReminder, getReminders } from "./core/settings.js";
 import { mountAskButton } from "./ui/ask.js";
-import { shouldShowWalkthrough } from "./core/walkthrough.js";
+import { shouldShowWalkthrough, walkthroughDone } from "./core/walkthrough.js";
 import { openWalkthrough } from "./ui/walkthrough.js";
+import { shouldShowIntro } from "./core/intro.js";
+import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.js";
 
-export const VERSION = "0.3.2";
+export const VERSION = "0.4.0";
 
 const view = $("#view");
 const store = await createStore();
@@ -65,7 +67,9 @@ const SCREEN_NAMES = {
   settings: "Settings",
   scan: "Buy or pass",
   taxes: "Taxes",
-  sites: "Site limits"
+  sites: "Site limits",
+  welcome: "Welcome",
+  demo: "Demo"
 };
 
 function render() {
@@ -100,6 +104,17 @@ function render() {
     renderTaxes(ctx, view, rest[0]);
   } else if (head === "sites") {
     renderCompat(ctx, view);
+  } else if (head === "welcome" || head === "demo") {
+    ctx.screen = SCREEN_NAMES[head];
+    renderHome(ctx, view);
+    queueMicrotask(() => {
+      if (!isIntroOpen()) {
+        openIntro({
+          mode: head === "demo" ? "demo" : "welcome",
+          onDone: afterIntro
+        });
+      }
+    });
   } else {
     ctx.screen = "Home";
     renderHome(ctx, view);
@@ -168,11 +183,31 @@ mountAskButton({
 const swOK = "serviceWorker" in navigator && !/[?&]nosw\b/.test(location.search);
 if (swOK) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
 
+function afterIntro() {
+  const raw = location.hash || "";
+  if (/#\/?welcome\b/.test(raw) || /#\/?demo\b/.test(raw)) ctx.go("#/home");
+  if (shouldShowWalkthrough() && !window.__flipQuiet && !/[?&]nowalk\b/.test(location.search)) {
+    openWalkthrough();
+  }
+}
+
 render();
 tickReminders();
 
-// First-run walkthrough: skippable, 4 short screens. Tests can skip it first.
-if (shouldShowWalkthrough() && !window.__flipQuiet && !/[?&]nowalk\b/.test(location.search)) {
+// First-open welcome (video + try-it demo), then the short tips.
+// Tests can skip with ?nointro or by opening after intro is marked done.
+const { head: firstHead } = parseHash();
+const autoIntro = shouldShowIntro(undefined, {
+  quiet: window.__flipQuiet,
+  search: location.search,
+  respectWalkthrough: true,
+  walkthroughDone: walkthroughDone()
+});
+if (firstHead === "welcome" || firstHead === "demo") {
+  // render() already queued the overlay
+} else if (autoIntro) {
+  openIntro({ onDone: afterIntro });
+} else if (shouldShowWalkthrough() && !window.__flipQuiet && !/[?&]nowalk\b/.test(location.search)) {
   openWalkthrough();
 }
 
@@ -188,5 +223,9 @@ window.__flip = {
   render,
   tickReminders,
   get scanWork() { return ctx.scanWork; },
-  setScan(w) { ctx.scanWork = w; }
+  setScan(w) { ctx.scanWork = w; },
+  openIntro,
+  closeIntro,
+  isIntroOpen,
+  getDemoSession
 };

@@ -73,16 +73,116 @@ const now = Date.now();
 try {
   await page.goto(base);
   await page.waitForSelector("html[data-ready='1']");
-  await page.evaluate(() => { window.__flipQuiet = true; });
+  await page.evaluate(() => { window.__flipFast = true; });
+  const intro = () => page.textContent("#intro-root");
+
+  await step("first-open welcome plays a placeholder video and offers a try-it demo", async () => {
+    await page.waitForSelector("#intro-root");
+    assert.ok(await page.isVisible("#intro-root"), "welcome opens on first open");
+    assert.match(await intro(), /Jessika.?s/);
+    assert.match(await intro(), /Flip Side/);
+    assert.match(await intro(), /Video coming soon/);
+    assert.ok(await page.isVisible('#intro-root [data-act="try-photo"]'), "Try it with your own photo");
+    assert.ok(await page.isVisible('#intro-root [data-act="try-sample"]'), "Try a sample item");
+    assert.ok(await page.isVisible('#intro-root [data-act="skip-video"]'), "Skip on the video");
+    assert.ok(await page.isVisible("#intro-ph"), "placeholder is shown until a video is dropped in");
+    await shot("welcome", { also: "v4-welcome.png" });
+
+    // Photo path is offered; then we take the sample path through the whole demo.
+    await page.click('#intro-root [data-act="try-photo"]');
+    await page.waitForSelector('#intro-root [data-step="photo"]');
+    assert.match(await intro(), /Take a photo|Take or choose/i);
+    assert.match(await intro(), /For real/);
+    await shot("photo", { also: "v4-demo-photo.png" });
+
+    await page.click('#intro-root [data-act="try-sample"]');
+    await page.waitForSelector('#intro-root [data-step="samples"]');
+    assert.equal(await page.locator("#intro-root [data-sample]").count(), 3);
+    assert.match(await intro(), /Speckled ceramic mug/);
+    assert.match(await intro(), /Wooden picture frame/);
+    assert.match(await intro(), /Navy canvas tote/);
+    await shot("samples", { also: "v4-samples.png" });
+
+    await page.click('#intro-root [data-sample="mug"]');
+    await page.waitForSelector('#intro-root [data-step="draft"][data-ready="1"]');
+    assert.match(await intro(), /Sample/);
+    assert.match(await intro(), /For real/);
+    assert.match(await intro(), /Speckled ceramic mug/);
+    assert.match(await intro(), /real items are left alone/i);
+    await shot("draft", { also: "v4-demo-draft.png" });
+
+    await page.click('#intro-root [data-act="next"]');
+    await page.waitForSelector('#intro-root [data-step="scan"]');
+    assert.match(await intro(), /Buy or pass|Buy up to/i);
+    assert.match(await intro(), /For real/);
+    await shot("scan", { also: "v4-demo-scan.png" });
+
+    await page.click('#intro-root [data-act="next"]');
+    await page.waitForSelector('#intro-root [data-step="sites"]');
+    assert.match(await intro(), /Where to list|Best price|Fastest/i);
+    await shot("sites", { also: "v4-demo-sites.png" });
+
+    await page.click('#intro-root [data-act="list-pretend"]');
+    await page.waitForSelector('#intro-root [data-step="listing"][data-ready="1"]');
+    assert.match(await intro(), /Pretend: nothing was posted/);
+    await shot("listing", { also: "v4-demo-listing.png" });
+
+    await page.click('#intro-root [data-act="next"]');
+    await page.waitForSelector('#intro-root [data-step="sold"]');
+    assert.match(await intro(), /Sold on Mercari/);
+    assert.match(await intro(), /Pretend/);
+    await shot("sold", { also: "v4-demo-sold.png" });
+
+    await page.click('#intro-root [data-act="next"]');
+    await page.waitForSelector('#intro-root [data-step="takedown"]');
+    assert.match(await intro(), /Take them all down|nothing was taken down/i);
+    if (await page.isVisible('#intro-root [data-act="takedown-all"]')) {
+      await shot("takedown", { also: "v4-demo-takedown.png" });
+      await page.click('#intro-root [data-act="takedown-all"]');
+      await page.waitForTimeout(250);
+      assert.match(await intro(), /Removed/);
+    }
+    await shot("takedown-done", { also: "v4-demo-takedown-done.png" });
+
+    await page.click('#intro-root [data-act="next"]');
+    await page.waitForSelector('#intro-root [data-step="pack"]');
+    assert.match(await intro(), /Pack/i);
+    assert.match(await intro(), /Bin/i);
+    await shot("pack", { also: "v4-demo-pack.png" });
+
+    await page.click('#intro-root [data-act="packed"]');
+    await page.waitForSelector('#intro-root [data-step="ship"]');
+    assert.match(await intro(), /Ship|Estimate/i);
+    await shot("ship", { also: "v4-demo-ship.png" });
+
+    await page.click('#intro-root [data-act="shipped"]');
+    await page.waitForSelector('#intro-root [data-step="profit"]');
+    assert.match(await intro(), /profit|What you kept/i);
+    await shot("profit", { also: "v4-demo-profit.png" });
+
+    assert.equal(await page.evaluate(() => window.__flip.items.length), 0, "demo must not touch real inventory");
+
+    await page.click('#intro-root [data-act="goto-end"]');
+    await page.waitForSelector('#intro-root [data-step="end"]');
+    assert.match(await intro(), /Add it to your Home Screen|already on your Home Screen/);
+    assert.match(await intro(), /Share|Add to Home Screen|already/);
+    assert.ok(await page.isVisible('#intro-root [data-act="start-real"]'));
+    await shot("end", { also: "v4-end.png" });
+
+    await page.click('#intro-root [data-act="start-real"]');
+    await page.waitForSelector("#intro-root", { state: "detached" });
+    assert.equal(await page.evaluate(() => window.__flip.items.length), 0);
+  });
 
   await step("walkthrough is skippable and Ask a question is always visible", async () => {
-    assert.ok(await page.isVisible("#walkthrough"), "first-run walkthrough opens");
+    assert.ok(await page.isVisible("#walkthrough"), "tips open after Start for real");
     assert.match(await page.textContent("#walkthrough"), /Welcome to Jessika's Flip Side/);
     assert.match(await page.textContent("#walkthrough"), /1 of 4/);
     await shot("walkthrough", { also: "v3-walkthrough.png" });
     assert.ok(await page.isVisible('#walkthrough [data-r="skip"]'));
     await page.click('#walkthrough [data-r="skip"]');
     await page.waitForSelector("#walkthrough", { state: "detached" });
+    await page.evaluate(() => { window.__flipQuiet = true; });
     assert.ok(await page.isVisible("#ask-fab"), "Ask a question is on every screen");
     await page.click("#ask-fab");
     await page.waitForSelector("#ask-sheet");
@@ -132,7 +232,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Jessika's Flip Side v0\.3\.2/);
+    assert.match(await text(), /Jessika's Flip Side v0\.4\.0/);
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);
@@ -153,6 +253,8 @@ try {
     assert.match(await text(), /See what each site allows/);
     assert.match(await text(), /Import items from a spreadsheet|CSV/);
     assert.ok(await page.isVisible("#ask-fab"));
+    assert.match(await text(), /Watch the intro/);
+    assert.match(await text(), /Try the demo/);
     await page.locator("#sitescard").scrollIntoViewIfNeeded();
     await shot("settings-sites", { also: "04-settings.png" });
     await page.locator("#pausecard").scrollIntoViewIfNeeded();
