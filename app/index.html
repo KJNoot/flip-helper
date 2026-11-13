@@ -8,9 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="Flip Helper">
+<meta name="apple-mobile-web-app-title" content="Flip Side">
 <meta name="format-detection" content="telephone=no">
-<title>Flip Helper</title>
+<title>Jessica's Flip Side</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
@@ -18,7 +18,19 @@
 </head>
 <body>
 <header class="apphead">
-  <div class="apphead-name">Flip Helper</div>
+  <a class="apphead-brand" href="#/home" aria-label="Jessica's Flip Side">
+    <svg class="wordmark-mark" viewBox="0 0 32 32" aria-hidden="true" focusable="false">
+      <rect width="32" height="32" rx="9" fill="#0f766e"/>
+      <path d="M9 15.2c.7-3.5 3.6-6 7.2-6 2.6 0 4.9 1.3 6.3 3.3" fill="none" stroke="#fff" stroke-width="2.15" stroke-linecap="round"/>
+      <path d="M24.4 8.4l.1 5.3-4.8-1.7z" fill="#fff"/>
+      <path d="M23 16.8c-.7 3.5-3.6 6-7.2 6-2.6 0-4.9-1.3-6.3-3.3" fill="none" stroke="#5eead4" stroke-width="2.15" stroke-linecap="round"/>
+      <path d="M7.6 23.6l-.1-5.3 4.8 1.7z" fill="#5eead4"/>
+    </svg>
+    <span class="wordmark">
+      <span class="wordmark-script">Jessica’s</span>
+      <span class="wordmark-bold">Flip Side</span>
+    </span>
+  </a>
   <button type="button" class="suggest-btn" id="suggest-open">Send a suggestion</button>
 </header>
 <main id="view" aria-live="polite"><div class="empty"><span class="em">📷</span>Loading…</div></main>
@@ -30,7 +42,7 @@
   <a href="#/settings" data-tab="settings"><span class="ti" aria-hidden="true">⚙️</span>Settings</a>
 </nav>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
-<noscript>Flip Helper needs JavaScript turned on.</noscript>
+<noscript>Jessica's Flip Side needs JavaScript turned on.</noscript>
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

@@ -564,7 +564,7 @@ export function exportPayload(items, version, at = Date.now(), extras = {}) {
 
 export function importPayload(data) {
   if (!data || typeof data !== "object") throw new Error("That file couldn't be read.");
-  if (data.app && data.app !== EXPORT_APP) throw new Error("That file is not a Flip Helper backup.");
+  if (data.app && data.app !== EXPORT_APP) throw new Error("That file is not a Jessica's Flip Side backup.");
   const items = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : null);
   if (!items) throw new Error("That file has no items in it.");
   return items.map(i => normalizeItem(i));

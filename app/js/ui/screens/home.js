@@ -21,7 +21,7 @@ export function renderHome(ctx, el) {
   const paused = settings.pauseAutomation;
   el.innerHTML = `
     <div class="hero">
-      <p class="eyebrow">Flip Helper</p>
+      <p class="hero-brand"><span class="wordmark-script">Jessica’s</span><span class="wordmark-bold">Flip Side</span></p>
       <h1>Take a photo. Get a draft. Keep track.</h1>
       <p class="muted">A pocket helper for listing the same item on more than one site.</p>
       <div class="hero-actions">

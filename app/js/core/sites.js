@@ -1,4 +1,4 @@
-// Selling sites Flip Helper knows about. "sellUrl" opens that site's own create-listing page.
+// Selling sites Jessica's Flip Side knows about. "sellUrl" opens that site's own create-listing page.
 // "manageUrl" opens a page where she can edit or take a listing down. There is no official
 // public door for a small iPhone app to post or delist on most of these, so we only open links.
 export const SITES = [

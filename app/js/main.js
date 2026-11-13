@@ -1,4 +1,4 @@
-// Flip Helper — iPhone-first PWA. No account. Inventory stays on the phone.
+// Jessica's Flip Side — iPhone-first PWA. No account. Inventory stays on the phone.
 import { $, toast } from "./ui/dom.js";
 import { openSuggest } from "./ui/suggest.js";
 import { createStore } from "./core/storage.js";
@@ -17,7 +17,7 @@ import { mountAskButton } from "./ui/ask.js";
 import { shouldShowWalkthrough } from "./core/walkthrough.js";
 import { openWalkthrough } from "./ui/walkthrough.js";
 
-export const VERSION = "0.3.0";
+export const VERSION = "0.3.1";
 
 const view = $("#view");
 const store = await createStore();
@@ -117,7 +117,7 @@ function updateChrome() {
     if (n > 0) { badge.hidden = false; badge.textContent = String(n); }
     else { badge.hidden = true; badge.textContent = ""; }
   }
-  const base = "Flip Helper";
+  const base = "Jessica's Flip Side";
   document.title = n > 0 ? `(${n}) ${base}` : base;
 }
 

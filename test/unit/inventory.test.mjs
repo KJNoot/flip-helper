@@ -282,7 +282,7 @@ describe("backup export", () => {
     assert.equal(back[0].stage, "listed");
   });
   it("rejects a file from another app", () => {
-    assert.throws(() => importPayload({ app: "other", items: [] }), /not a Flip Helper/);
+    assert.throws(() => importPayload({ app: "other", items: [] }), /not a Jessica's Flip Side/);
     assert.throws(() => importPayload("nope"), /couldn't be read/);
     assert.throws(() => importPayload({ app: "flip-helper" }), /no items/);
   });
@@ -347,11 +347,11 @@ describe("device-held key store", () => {
 });
 
 describe("suggestion mailto", () => {
-  it("uses the Flip Helper subject and prefills version and screen", () => {
+  it("uses the Flip Side subject and prefills version and screen", () => {
     const href = suggestMailto({ version: "0.1.0", screen: "Home", text: "Add Grailed" });
     assert.ok(href.startsWith(`mailto:${SUGGEST_TO}?`));
-    assert.equal(SUGGEST_SUBJECT, "Flip Helper suggestion");
-    assert.match(href, /subject=Flip%20Helper%20suggestion/);
+    assert.equal(SUGGEST_SUBJECT, "Flip Side suggestion");
+    assert.match(href, /subject=Flip%20Side%20suggestion/);
     const body = decodeURIComponent(href.split("body=")[1]);
     assert.match(body, /App version: 0\.1\.0/);
     assert.match(body, /Screen: Home/);

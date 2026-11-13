@@ -70,11 +70,11 @@ export function renderSettings(ctx, el) {
 
     <div class="card" id="dropcard">
       <h3>Price-drop ideas</h3>
-      <p class="small muted">When a listing has been up this many days with no sale, Flip Helper will suggest a price drop or sending offers. You approve each one, then change it on the site yourself. A drop will not go below your profit floor.</p>
+      <p class="small muted">When a listing has been up this many days with no sale, Jessica's Flip Side will suggest a price drop or sending offers. You approve each one, then change it on the site yourself. A drop will not go below your profit floor.</p>
       <label class="field"><span>Suggest a drop after this many days</span>
         <input id="dropdays" type="number" min="1" max="365" inputmode="numeric" value="${esc(settings.dropAfterDays)}">
       </label>
-      <label class="field"><span>Default profit floor ${tip("The lowest asking price Flip Helper will suggest. Each item can have its own floor. A price-drop idea will never go below this.")}</span>
+      <label class="field"><span>Default profit floor ${tip("The lowest asking price Jessica's Flip Side will suggest. Each item can have its own floor. A price-drop idea will never go below this.")}</span>
         <input id="profitfloor" type="text" inputmode="decimal" value="${esc(settings.defaultProfitFloor ?? "")}" placeholder="5.00">
       </label>
       <label class="field"><span>Profit you want when buying ${tip("Used by “Buy up to” on the Buy or pass screen: estimated resale minus fees, shipping, and this amount.")}</span>
@@ -106,14 +106,14 @@ export function renderSettings(ctx, el) {
 
     <div class="card" id="remindcard">
       <div class="row between"><h3>Take-down reminders</h3>${honesty("ok", "Working")}</div>
-      <p class="small muted">When something sells and is still listed on other sites, Flip Helper shows a countdown and reminds you in the app. If you allow notifications, you'll also get a phone notification while the app is open. Reminders while the app is closed need a computer helper, which is coming later. The Pause all switch above turns these off.</p>
+      <p class="small muted">When something sells and is still listed on other sites, Jessica's Flip Side shows a countdown and reminds you in the app. If you allow notifications, you'll also get a phone notification while the app is open. Reminders while the app is closed need a computer helper, which is coming later. The Pause all switch above turns these off.</p>
       <button type="button" class="btn soft" data-act="notify">${settings.notifyDelist ? "Reminders are on — tap to check again" : "Turn on take-down reminders"}</button>
       <p class="tiny muted" id="notifystatus"></p>
     </div>
 
     <div class="card" id="ebaycard">
       <div class="row between"><h3>Official eBay sold prices</h3>${honesty("later", "Coming later")}</div>
-      <p class="small muted">${esc(ebayOfficialAdapter.needs)}. When that's set up, Flip Helper will look up real sold prices through eBay's official API, with your permission. It will not scrape eBay, and it will not ask for your eBay password.</p>
+      <p class="small muted">${esc(ebayOfficialAdapter.needs)}. When that's set up, Jessica's Flip Side will look up real sold prices through eBay's official API, with your permission. It will not scrape eBay, and it will not ask for your eBay password.</p>
       <label class="check" style="opacity:.7">
         <input type="checkbox" disabled ${settings.ebayOfficialComps ? "checked" : ""}>
         <span>Use official eBay sold prices (not available yet)</span>
@@ -158,16 +158,16 @@ export function renderSettings(ctx, el) {
       <h3>What this version does</h3>
       <p class="small">${honesty("ok", "Working")} Photo to a draft, Buy or pass with a “Buy up to” amount, inventory with bins and QR labels, full profit, a sold take-down checklist with a guided walk-through, price-drop ideas that respect your profit floor, a morning list, taxes, CSV import and export, and an Ask-a-question helper. Works offline except for AI checks.</p>
       <p class="small">${honesty("warn", "Estimate")} AI prices, sold-price estimates, fees, shipping costs, pricing options, and Buy or pass verdicts.</p>
-      <p class="small">${honesty("warn", "Needs you to post")} Posting, taking listings down, and changing a price is something you do in each site's own app. The guided take-down opens each site and ticks it off when you say you did it. Flip Helper does not log into those accounts.</p>
+      <p class="small">${honesty("warn", "Needs you to post")} Posting, taking listings down, and changing a price is something you do in each site's own app. The guided take-down opens each site and ticks it off when you say you did it. Jessica's Flip Side does not log into those accounts.</p>
       <p class="small">${honesty("later", "Coming later")} Official one-tap listing and take-down (eBay, Etsy, Shopify first), official eBay sold prices, a computer helper, and buying shipping labels. Some sites will always need your tap. Not promised for Poshmark, Mercari, or Facebook Marketplace unless those companies open an official door.</p>
     </div>
 
     <div class="card flat">
       <h3>Privacy</h3>
-      <p class="small">Your items and photos stay on this phone. The AI key stays on this phone. A photo is sent to the AI service only when you ask for a draft. No account is required. Flip Helper will not ask for a selling-site password.</p>
+      <p class="small">Your items and photos stay on this phone. The AI key stays on this phone. A photo is sent to the AI service only when you ask for a draft. No account is required. Jessica's Flip Side will not ask for a selling-site password.</p>
     </div>
     <p class="tiny muted center" id="no-sub">${esc(NO_SUBSCRIPTION_NOTE)}</p>
-    <p class="tiny muted center">Flip Helper v${esc(ctx.version)}</p>
+    <p class="tiny muted center">Jessica's Flip Side v${esc(ctx.version)}</p>
   `;
 
   $("#imp", el).addEventListener("change", async e => {
@@ -190,7 +190,7 @@ export function renderSettings(ctx, el) {
       await ctx.reload();
       ctx.render();
     } catch (err) {
-      toast(err && /Flip Helper|couldn't be read|no items/i.test(err.message) ? err.message : "That file couldn't be read.");
+      toast(err && /Flip Side|Jessica|couldn't be read|no items/i.test(err.message) ? err.message : "That file couldn't be read.");
     }
   });
 

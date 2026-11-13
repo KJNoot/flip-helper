@@ -19,5 +19,5 @@ export function serve(port = 0) {
 }
 if (import.meta.url === `file://${process.argv[1]}`) {
   const s = await serve(+process.argv[2] || 8080);
-  console.log(`Flip Helper at http://127.0.0.1:${s.address().port}/`);
+  console.log(`Jessica's Flip Side at http://127.0.0.1:${s.address().port}/`);
 }

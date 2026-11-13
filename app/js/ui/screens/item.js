@@ -89,8 +89,8 @@ export function renderItem(ctx, el, item) {
     ${compsCard(item)}
 
     <div class="card" id="post">
-      <div class="row between"><h3>Post it</h3>${honesty("warn", "Needs you to post")} ${tip("Copy the listing, open the site, paste it, and post it yourself. Then tick the site so Flip Helper can keep track. This app does not post for you.")}</div>
-      <p class="small muted">Copy the listing, open the site's own selling page, paste it, and post it yourself. Then tick the site so Flip Helper can keep track.</p>
+      <div class="row between"><h3>Post it</h3>${honesty("warn", "Needs you to post")} ${tip("Copy the listing, open the site, paste it, and post it yourself. Then tick the site so Jessica's Flip Side can keep track. This app does not post for you.")}</div>
+      <p class="small muted">Copy the listing, open the site's own selling page, paste it, and post it yourself. Then tick the site so Jessica's Flip Side can keep track.</p>
       ${siteLists(item, listed)}
     </div>
 
@@ -383,7 +383,7 @@ export function renderItem(ctx, el, item) {
       if (!sug) return;
       if (!(await confirmSheet({
         title: `Drop the price on ${sug.siteName}?`,
-        body: `This will change your asking price in Flip Helper to ${formatUsd(sug.toPrice)}. You'll still need to change it on ${sug.siteName} yourself. It will not go below your profit floor.`,
+        body: `This will change your asking price in Jessica's Flip Side to ${formatUsd(sug.toPrice)}. You'll still need to change it on ${sug.siteName} yourself. It will not go below your profit floor.`,
         ok: "Approve"
       }))) return;
       const next = recordDropDecision(item, sug, "approved");

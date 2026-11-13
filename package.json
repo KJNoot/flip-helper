@@ -1,8 +1,8 @@
 {
   "name": "flip-helper",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
-  "description": "Flip Helper: take a photo, draft a listing, and keep track of what you sell. iPhone-first PWA.",
+  "description": "Jessica's Flip Side: take a photo, draft a listing, and keep track of what you sell. iPhone-first PWA.",
   "type": "module",
   "scripts": {
     "serve": "node tools/serve.mjs",

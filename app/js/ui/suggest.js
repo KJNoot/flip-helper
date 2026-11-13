@@ -3,7 +3,7 @@
 import { esc, $, closeSheets } from "./dom.js";
 
 export const SUGGEST_TO = "kens.remi@mail.grokbot.com";
-export const SUGGEST_SUBJECT = "Flip Helper suggestion";
+export const SUGGEST_SUBJECT = "Flip Side suggestion";
 
 export function suggestMailto({ version = "", screen = "", text = "" } = {}) {
   const body = [
