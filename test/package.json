@@ -1,0 +1,7 @@
+{
+  "name": "flip-helper-tests",
+  "private": true,
+  "type": "module",
+  "scripts": { "test": "node smoke.test.mjs" },
+  "devDependencies": { "playwright": "1.64.1" }
+}

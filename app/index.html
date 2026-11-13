@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f766e">
+<meta name="description" content="Take a photo, get a listing draft, and keep track of what you sell on more than one site.">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Flip Helper">
+<meta name="format-detection" content="telephone=no">
+<title>Flip Helper</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="apphead">
+  <div class="apphead-name">Flip Helper</div>
+  <button type="button" class="suggest-btn" id="suggest-open">Send a suggestion</button>
+</header>
+<main id="view" aria-live="polite"><div class="empty"><span class="em">📷</span>Loading…</div></main>
+<nav class="tabs" aria-label="Main">
+  <a href="#/home" data-tab="home"><span class="ti" aria-hidden="true">🏠</span>Home</a>
+  <a href="#/items" data-tab="items"><span class="ti" aria-hidden="true">📦</span>Items</a>
+  <a href="#/add" data-tab="add"><span class="ti" aria-hidden="true">📷</span>Add</a>
+  <a href="#/settings" data-tab="settings"><span class="ti" aria-hidden="true">⚙️</span>Settings</a>
+</nav>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<noscript>Flip Helper needs JavaScript turned on.</noscript>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

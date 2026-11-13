@@ -1,0 +1,14 @@
+{
+  "name": "flip-helper",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Flip Helper: take a photo, draft a listing, and keep track of what you sell. iPhone-first PWA.",
+  "type": "module",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "test": "npm run test:unit && npm run test:smoke",
+    "test:unit": "node --test test/unit/*.test.mjs",
+    "test:smoke": "cd test && node smoke.test.mjs",
+    "icons": "python3 tools/make-icons.py"
+  }
+}
