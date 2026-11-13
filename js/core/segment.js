@@ -1,4 +1,5 @@
-// Lazy-load U²-Netp and onnxruntime-web, run a 320×320 mask, and hand
+// Lazy-load U²-Netp and onnxruntime-web, run a 320×320 mask (then a tighter second pass on the
+// item itself, so edges are inferred at a higher effective resolution), and hand
 // the result to the studio pipeline. Nothing here runs until someone
 // taps “Make it look pro.” There is no paid API.
 //
@@ -7,8 +8,12 @@
 
 import {
   STUDIO_MODEL, STUDIO_PROGRESS_FIRST, STUDIO_PROGRESS_WORKING, STUDIO_FALLBACK_MSG,
-  STUDIO_QUALITY, STUDIO_MAX_WORKING_EDGE, prepareInputTensor, studioOrBasic,
-  renderStudio, workingSize
+  STUDIO_QUALITY, STUDIO_MAX_WORKING_EDGE, STUDIO_MAX_COMPOSITE_EDGE,
+  prepareInputTensor, studioOrBasic,
+  renderStudio, workingSize, upsampleMask, foregroundBounds, subjectPadBox,
+  cropRGBA, pasteMask, resizeRGBA, subjectTiles,
+  maskConvexHull, keepInsideHull, dilateMask,
+  columnEnvelope, keepInsideEnvelope
 } from "./studio.js";
 import { cleanupDataUrl } from "./photo.js";
 
@@ -183,20 +188,109 @@ export async function loadStudioModel({ onProgress, fetchImpl } = {}) {
   }
 }
 
-export async function inferMask(pixels, { onProgress } = {}) {
-  const loaded = await loadStudioModel({ onProgress });
-  const tensor = prepareInputTensor(pixels.data, pixels.width, pixels.height);
+async function inferOnce(pixels, loaded) {
+  const size = STUDIO_MODEL.inputSize;
+  const tensor = prepareInputTensor(pixels.data, pixels.width, pixels.height, { size });
   if (loaded.worker) {
-    const msg = await workerCall(loaded.worker, { type: "infer", tensor }, [tensor.buffer], 60000);
-    return { mask: msg.mask, width: msg.width || 320, height: msg.height || 320 };
+    // Copy: the worker transfers the buffer away.
+    const copy = tensor.slice();
+    const msg = await workerCall(loaded.worker, { type: "infer", tensor: copy, size }, [copy.buffer], 60000);
+    return { mask: msg.mask, width: msg.width || size, height: msg.height || size };
   }
   const { session, ort } = loaded;
   if (!session || !ort) throw new Error("studio: model is not ready");
-  const feeds = { [STUDIO_MODEL.inputName]: new ort.Tensor("float32", tensor, [1, 3, STUDIO_MODEL.inputSize, STUDIO_MODEL.inputSize]) };
+  const feeds = { [STUDIO_MODEL.inputName]: new ort.Tensor("float32", tensor, [1, 3, size, size]) };
   const out = await session.run(feeds);
   const pred = out[session.outputNames[0]];
   const mask = pred.data instanceof Float32Array ? pred.data : Float32Array.from(pred.data);
-  return { mask, width: STUDIO_MODEL.inputSize, height: STUDIO_MODEL.inputSize };
+  return { mask, width: size, height: size };
+}
+
+/**
+ * First pass on the whole photo, then a second pass on a tight crop of the
+ * item. The second 320×320 covers just the subject, so edges are inferred
+ * at a much higher effective resolution — without a heavier model.
+ * Returns a full-size mask (already upsampled to the photo).
+ */
+function downscaleForInfer(pixels) {
+  const work = workingSize(pixels.width, pixels.height, STUDIO_MAX_WORKING_EDGE);
+  if (work.scale === 1) return { src: pixels, work };
+  return {
+    src: {
+      data: resizeRGBA(pixels.data, pixels.width, pixels.height, work.width, work.height),
+      width: work.width,
+      height: work.height
+    },
+    work
+  };
+}
+
+/**
+ * Infer at a memory-safe working size, then (optionally) a tighter second
+ * pass on the item. The returned mask is always upsampled to the incoming
+ * photo size, so the composite can use the photo's own pixels.
+ */
+export async function inferMask(pixels, { onProgress, refineCrop = true } = {}) {
+  const loaded = await loadStudioModel({ onProgress });
+  const { src } = downscaleForInfer(pixels);
+  const first = await inferOnce(src, loaded);
+  const workMask = upsampleMask(first.mask, first.width, first.height, src.width, src.height);
+  let resultMask = workMask;
+  let passes = 1;
+  let box = null;
+  if (refineCrop) {
+    const bounds = foregroundBounds(workMask, src.width, src.height, { threshold: 0.28 });
+    if (bounds && bounds.w >= 8 && bounds.h >= 8) {
+      const cropBox = subjectPadBox(bounds, src.width, src.height, 0.2, 24);
+      const areaFrac = (cropBox.w * cropBox.h) / (src.width * src.height);
+      if (areaFrac <= 0.82) {
+        const crop = cropRGBA(src.data, src.width, src.height, cropBox);
+        const second = await inferOnce(crop, loaded);
+        const cropMask = upsampleMask(second.mask, second.width, second.height, crop.width, crop.height);
+        resultMask = new Float32Array(src.width * src.height);
+        pasteMask(resultMask, src.width, src.height, cropMask, crop.width, crop.height, cropBox.x, cropBox.y);
+        passes = 2;
+        box = cropBox;
+      }
+      const baseline = Float32Array.from(resultMask);
+      // A wide implement (a rear blade, a bench) is still tiny in a single
+      // 320 pass on the whole crop. Overlapping square tiles give each
+      // piece a much higher effective resolution. Tiles use a tighter pad
+      // than the second pass so each crop is mostly the item, not a sea
+      // of grass — that's what lets the 320 model see a green side plate
+      // against a green lawn. Results are merged with max() so a strong
+      // tile can fill a part the coarser pass missed, without wiping a
+      // part it got right. Compact (table-top) crops skip this and stay
+      // on the single second pass.
+      const tileBox = subjectPadBox(bounds, src.width, src.height, 0.06, 12);
+      const tiles = subjectTiles(tileBox, src.width, src.height);
+      for (const t of tiles) {
+        if (t.w < 16 || t.h < 16) continue;
+        const crop = cropRGBA(src.data, src.width, src.height, t);
+        const tiled = await inferOnce(crop, loaded);
+        const tileMask = upsampleMask(tiled.mask, tiled.width, tiled.height, crop.width, crop.height);
+        resultMask = pasteMask(
+          resultMask, src.width, src.height,
+          tileMask, crop.width, crop.height,
+          t.x, t.y, { mode: "max" }
+        );
+        passes += 1;
+        box = box || cropBox;
+      }
+      if (tiles.length) {
+        // Column-wise envelope of the coarser pass: a missing side plate
+        // sits in a gap we interpolate across, but leaves under the
+        // moldboard sit below the local bottom edge and are dropped.
+        const env = columnEnvelope(baseline, src.width, src.height, { threshold: 0.35 });
+        resultMask = keepInsideEnvelope(resultMask, src.width, src.height, env, baseline, { pad: 6 });
+      }
+    }
+  }
+  // Lift the working-size mask up to the photo's own resolution.
+  const full = (src.width === pixels.width && src.height === pixels.height)
+    ? resultMask
+    : upsampleMask(resultMask, src.width, src.height, pixels.width, pixels.height);
+  return { mask: full, width: pixels.width, height: pixels.height, passes, box };
 }
 
 function decodeImage(dataUrl) {
@@ -209,7 +303,7 @@ function decodeImage(dataUrl) {
 }
 
 /** Decode a data URL, capped to the working long edge for iPhone memory. */
-export async function pixelsFromDataUrl(dataUrl, { maxEdge = STUDIO_MAX_WORKING_EDGE } = {}) {
+export async function pixelsFromDataUrl(dataUrl, { maxEdge = STUDIO_MAX_COMPOSITE_EDGE } = {}) {
   const img = await decodeImage(dataUrl);
   const w0 = img.naturalWidth || img.width;
   const h0 = img.naturalHeight || img.height;

@@ -23,7 +23,7 @@ import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.j
 import { shouldShowTermsGate, rememberInviteIfValid } from "./core/invite.js";
 import { openTerms, closeTerms, isTermsOpen } from "./ui/terms.js";
 
-export const VERSION = "0.7.0";
+export const VERSION = "0.7.1";
 
 const view = $("#view");
 const store = await createStore();
