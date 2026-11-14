@@ -7,6 +7,8 @@ import {
   getTrips, addTrip, removeTrip, getSettings, mileageRateFor, IRS_PAGE, ymd
 } from "../../core/settings.js";
 import { money } from "../../core/inventory.js";
+import { expensesInYear, expensesTotal } from "../../core/kris.js";
+import { krisStore } from "../kris.js";
 
 export function renderTaxes(ctx, el, year) {
   const y = Number(year) || new Date().getFullYear();
@@ -53,6 +55,8 @@ export function renderTaxes(ctx, el, year) {
         : `<p class="tiny muted" style="margin-top:10px">No trips logged in ${esc(String(y))}.</p>`}
     </div>
 
+    <div class="card" id="kris-expenses" hidden></div>
+
     <div class="card">
       <h3>Sold items in ${esc(String(y))}</h3>
       ${totals.sold.length ? `<div class="tablewrap"><table class="fee-table">
@@ -63,6 +67,8 @@ export function renderTaxes(ctx, el, year) {
 
     <p class="tiny muted center" id="tax-print-note">${esc(TAX_DISCLAIMER)}</p>
   `;
+
+  paintKrisExpenses(el, y);
 
   $("#tax-year", el).addEventListener("change", e => {
     ctx.go("#/taxes/" + e.target.value);
@@ -88,6 +94,13 @@ export function renderTaxes(ctx, el, year) {
       addTrip({ date: values.date, miles, purpose: values.purpose, rate: info.rate, rateSource: info.source });
       toast("Trip added");
       ctx.render();
+    },
+    delexpense: async b => {
+      if (!(await confirmSheet({ title: "Remove this expense?", body: "It will be removed from Other expenses.", ok: "Remove", danger: true }))) return;
+      const list = await krisStore.get("krisExpenses", []);
+      await krisStore.set("krisExpenses", (Array.isArray(list) ? list : []).filter(x => x.id !== b.dataset.id));
+      toast("Expense removed");
+      paintKrisExpenses(el, y);
     },
     deltrip: async b => {
       if (!(await confirmSheet({ title: "Remove this trip?", body: "It will be removed from the mileage log on this phone.", ok: "Remove", danger: true }))) return;
@@ -140,4 +153,22 @@ function itemRow(item) {
     <td class="num">${esc(formatUsd(item.salePrice))}</td>
     <td class="num">${esc(formatUsd(profit))}</td>
   </tr>`;
+}
+
+// Expenses Kris logged for her (only shows when there are some). Shown on their own, like mileage;
+// they are not added into the totals above.
+async function paintKrisExpenses(el, y) {
+  const box = el.querySelector("#kris-expenses");
+  if (!box) return;
+  const all = await krisStore.get("krisExpenses", []);
+  const list = expensesInYear(Array.isArray(all) ? all : [], y);
+  if (!list.length) { box.hidden = true; box.innerHTML = ""; return; }
+  box.hidden = false;
+  box.innerHTML = `<div class="row between"><h3>Other expenses</h3>${honesty("ok", "Working")}</div>
+    <p class="small muted">Expenses you logged with Kris in ${esc(String(y))}: <b>${esc(formatUsd(expensesTotal(list)))}</b>. They are shown here on their own and are not added into the totals above.</p>
+    <ul class="itemlist">${list.map(e => `<li><div class="li">
+      <span class="grow"><b>${esc(e.what)}</b><span class="tiny muted">${esc(e.date)}${e.where ? " · " + esc(e.where) : ""}${e.notes ? " · " + esc(e.notes) : ""}</span></span>
+      <span class="tiny muted price">${esc(e.amount != null ? formatUsd(e.amount) : "—")}</span>
+      <button type="button" class="btn sm dangerghost" data-act="delexpense" data-id="${esc(e.id)}">Remove</button>
+    </div></li>`).join("")}</ul>`;
 }

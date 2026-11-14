@@ -12,7 +12,7 @@ import { renderScan } from "./ui/screens/scan.js";
 import { renderSecondLook, mountSecondLookBanner } from "./ui/screens/secondlook.js";
 import { renderTaxes } from "./ui/screens/taxes.js";
 import { renderCompat } from "./ui/screens/compat.js";
-import { getJob as getSecondLookJob, loadScans, startSecondLook, saveScan, clearSecondLook, getScan } from "./core/secondlook.js";
+import { getJob as getSecondLookJob, loadScans, startSecondLook, saveScan, clearSecondLook, getScan, removeScan } from "./core/secondlook.js";
 import { badgeCount, attentionItems, shouldRemind, reminderBody, delistCountdown } from "./core/protect.js";
 import { getSettings, setReminder, getReminders } from "./core/settings.js";
 import { mountAskButton } from "./ui/ask.js";
@@ -22,11 +22,15 @@ import { shouldShowIntro } from "./core/intro.js";
 import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.js";
 import { shouldShowTermsGate, rememberInviteIfValid } from "./core/invite.js";
 import { openTerms, closeTerms, isTermsOpen } from "./ui/terms.js";
+import { takeSetupLink, krisKvSnapshot, applyKrisKv, onKrisChange } from "./core/kris.js";
+import { mountKris, openKris, closeKris } from "./ui/kris.js";
 
-export const VERSION = "0.8.0";
+export const VERSION = "0.9.0";
 
 const view = $("#view");
 const store = await createStore();
+// Private Kris setup link (#kris=CODE): keep the code on this device, then take it out of the address bar.
+const krisSetUp = takeSetupLink(location, history);
 
 const ctx = {
   version: VERSION,
@@ -192,6 +196,10 @@ function tickReminders() {
 let remindTimer = setInterval(tickReminders, 15000);
 document.addEventListener("visibilitychange", () => { if (!document.hidden) tickReminders(); });
 
+// The setup link can also arrive while the app is already open (same page, new #kris=… hash).
+window.addEventListener("hashchange", () => {
+  if (takeSetupLink(location, history)) { mountKris(ctx); if (!window.__flipQuiet) toast("Kris is set up! Tap Ask Kris any time."); }
+});
 window.addEventListener("hashchange", render);
 $("#suggest-open").addEventListener("click", () => openSuggest({ version: VERSION, screen: ctx.screen }));
 
@@ -199,6 +207,9 @@ mountAskButton({
   version: VERSION,
   getScreen: () => ctx.screen
 });
+mountKris(ctx);
+if (krisSetUp && !window.__flipQuiet) setTimeout(() => toast("Kris is set up! Tap Ask Kris any time."), 600);
+onKrisChange(() => queueSync());
 
 const swOK = "serviceWorker" in navigator && !/[?&]nosw\b/.test(location.search);
 if (swOK) window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
@@ -229,7 +240,10 @@ async function maybeSync({ renderAfter = false } = {}) {
       store,
       loadScans: () => loadScans(),
       saveScan: s => saveScan(s),
-      removeScan: id => removeScan(id)
+      removeScan: id => removeScan(id),
+      // What Kris remembers, reminders and expenses ride along (never the Kris code or the AI key).
+      getKv: () => krisKvSnapshot(),
+      setKv: (key, payload, updatedAt) => applyKrisKv(key, payload, updatedAt)
     });
     if (r && r.ok && r.pulled > 0 && renderAfter) {
       await ctx.reload();
@@ -318,5 +332,7 @@ window.__flip = {
   getDemoSession,
   openTerms,
   closeTerms,
-  isTermsOpen
+  isTermsOpen,
+  openKris,
+  closeKris
 };
