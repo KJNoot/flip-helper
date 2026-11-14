@@ -22,15 +22,16 @@ import { shouldShowIntro } from "./core/intro.js";
 import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.js";
 import { shouldShowTermsGate, rememberInviteIfValid } from "./core/invite.js";
 import { openTerms, closeTerms, isTermsOpen } from "./ui/terms.js";
-import { takeSetupLink, krisKvSnapshot, applyKrisKv, onKrisChange } from "./core/kris.js";
-import { mountKris, openKris, closeKris } from "./ui/kris.js";
+import { takeSetupLink, krisKvSnapshot, applyKrisKv, onKrisChange, isStandaloneDisplay } from "./core/kris.js";
+import { mountKris, openKris, closeKris, bootKrisAccess } from "./ui/kris.js";
 
-export const VERSION = "0.9.0";
+export const VERSION = "0.9.1";
 
 const view = $("#view");
 const store = await createStore();
 // Private Kris setup link (#kris=CODE): keep the code on this device, then take it out of the address bar.
-const krisSetUp = takeSetupLink(location, history);
+const krisSetUp = takeSetupLink(location, history, undefined, { respectNoAuto: isStandaloneDisplay(window) });
+bootKrisAccess(); // cookie copied into a Home Screen app, the iPhone manifest, and the cookie for next time
 
 const ctx = {
   version: VERSION,
@@ -198,7 +199,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) tick
 
 // The setup link can also arrive while the app is already open (same page, new #kris=… hash).
 window.addEventListener("hashchange", () => {
-  if (takeSetupLink(location, history)) { mountKris(ctx); if (!window.__flipQuiet) toast("Kris is set up! Tap Ask Kris any time."); }
+  if (takeSetupLink(location, history)) { bootKrisAccess(); mountKris(ctx); if (!window.__flipQuiet) toast("Kris is set up! Tap Ask Kris any time."); }
 });
 window.addEventListener("hashchange", render);
 $("#suggest-open").addEventListener("click", () => openSuggest({ version: VERSION, screen: ctx.screen }));
@@ -245,6 +246,8 @@ async function maybeSync({ renderAfter = false } = {}) {
       getKv: () => krisKvSnapshot(),
       setKv: (key, payload, updatedAt) => applyKrisKv(key, payload, updatedAt)
     });
+    // Her Kris code may have just arrived from her other device.
+    if (r && r.ok) { bootKrisAccess(); mountKris(ctx); }
     if (r && r.ok && r.pulled > 0 && renderAfter) {
       await ctx.reload();
       if (ctx.screen !== "Settings") ctx.render();
