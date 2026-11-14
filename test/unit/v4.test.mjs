@@ -261,7 +261,7 @@ describe("double normalizeDraft (Apply on a draft) keeps site advice", () => {
 describe("service worker does not precache the intro video", () => {
   it("lists the poster and samples, skips intro.mp4, and skips runtime caching of mp4", () => {
     const sw = readFileSync(join(APP, "sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.9\.0/);
+    assert.match(sw, /flip-helper-v0\.9\.1/);
     assert.match(sw, /media\/intro-poster\.jpg/);
     assert.match(sw, /media\/samples\/mug\.jpg/);
     assert.doesNotMatch(sw, /media\/intro\.mp4/);

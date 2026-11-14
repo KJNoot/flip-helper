@@ -24,8 +24,8 @@ import { tip, openTip } from "../tips.js";
 import { PHOTO_CLEANUP_NOTE } from "../../core/photo.js";
 import { STUDIO_NOTE, STUDIO_BUTTON } from "../../core/studio.js";
 import { syncCardShell, bindSyncCard } from "../syncui.js";
-import { getCode, setCode, clearCode, isPlausibleCode } from "../../core/kris.js";
-import { mountKris, openKris } from "../kris.js";
+import { getCode, setCode, isPlausibleCode, krisKvSnapshot, applyKrisKv } from "../../core/kris.js";
+import { mountKris, openKris, bootKrisAccess, forgetCodeHere } from "../kris.js";
 
 export function renderSettings(ctx, el) {
   const n = ctx.items.length;
@@ -216,8 +216,11 @@ export function renderSettings(ctx, el) {
         store: ctx.store,
         loadScans: () => sl.loadScans(),
         saveScan: s => sl.saveScan(s),
-        removeScan: id => sl.removeScan(id)
-      });
+        removeScan: id => sl.removeScan(id),
+        // Pairing a device brings Kris along: her code and what Kris remembers come with the sync.
+        getKv: () => krisKvSnapshot(),
+        setKv: (key, payload, updatedAt) => applyKrisKv(key, payload, updatedAt)
+      }).then(r => { if (r && r.ok) { bootKrisAccess(); mountKris(ctx); } return r; });
     }
   }).catch(() => { /* card stays on "Loading…" if sync.js fails to load */ });
 
@@ -264,6 +267,7 @@ export function renderSettings(ctx, el) {
       const v = ($("#kris-code-settings", el) || {}).value || "";
       if (!isPlausibleCode(v)) { toast("That code looks too short"); return; }
       setCode(v);
+      bootKrisAccess();
       mountKris(ctx);
       toast("Saved. Tap Ask Kris any time.");
       ctx.render();
@@ -271,7 +275,7 @@ export function renderSettings(ctx, el) {
     krisopen: () => openKris(),
     krisoff: async () => {
       if (!(await confirmSheet({ title: "Turn off Kris on this device?", body: "This removes your code from this device. What Kris remembers stays, and you can type the code again any time.", ok: "Turn off" }))) return;
-      clearCode();
+      forgetCodeHere();
       mountKris(ctx);
       toast("Kris is off on this device");
       ctx.render();

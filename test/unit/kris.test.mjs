@@ -68,16 +68,17 @@ describe("Kris memory store and sync", () => {
     off();
     assert.ok(s.getItem(KV_PREFIX + "krisFacts"));
   });
-  it("the sync snapshot has only the four memory lists, never the code, and passes the key check", async () => {
+  it("the sync snapshot has the four memory lists plus her code (v0.9.1), and passes the key check", async () => {
     const s = mem(), store = createKrisStore(s);
     setCode(FAKE, s);
     await store.set("krisFacts", [{ t: "Sells on Mercari", ts: 1 }], 1000);
     await store.set("krisExpenses", [{ id: "ex_1", what: "Boxes", amount: 12 }], 2000);
     await store.set("somethingElse", ["x"]);
     const snap = krisKvSnapshot(s);
-    assert.deepEqual(Object.keys(snap).sort(), ["kris:krisExpenses", "kris:krisFacts"]);
+    assert.deepEqual(Object.keys(snap).sort(), ["kris:krisAccess", "kris:krisExpenses", "kris:krisFacts"]);
     assert.equal(snap["kris:krisFacts"].updatedAt, 1000);
-    assert.ok(!JSON.stringify(snap).includes(FAKE));
+    assert.deepEqual(snap["kris:krisAccess"].payload, { v: [FAKE] });
+    assert.ok(!JSON.stringify({ ...snap, "kris:krisAccess": null }).includes(FAKE), "the code is only in krisAccess");
     for (const v of Object.values(snap)) { assert.equal(payloadHasKey(v.payload), false); assert.deepEqual(stripKeyish(v.payload), v.payload); }
     assert.deepEqual(SYNC_NAMES, ["krisFacts", "krisTopics", "krisReminders", "krisExpenses"]);
   });
@@ -236,11 +237,12 @@ describe("Kris wiring and privacy", () => {
     const sw = read("app/sw.js");
     for (const f of ["js/core/kris-core.js", "js/core/kris.js", "js/ui/kris.js"]) assert.ok(sw.includes("'" + f + "'"), f);
     const main = read("app/js/main.js");
-    assert.match(main, /takeSetupLink\(location, history\)/);
+    assert.match(main, /takeSetupLink\(location, history/);
     assert.match(main, /mountKris\(ctx\)/);
     assert.match(main, /getKv: \(\) => krisKvSnapshot\(\)/);
     const ui = read("app/js/ui/kris.js");
-    assert.ok(!/\bfetch\(/.test(ui), "the panel only talks to Kris through kris-core");
+    const fetches = ui.match(/\bfetch\([^)]*\)/g) || [];
+    assert.deepEqual(fetches, ["fetch(href)"], "the panel only talks to Kris through kris-core (its one fetch reads the app's own manifest)");
     assert.ok(!/navigator\.share\(\{[^}]*files/.test(ui));
   });
   it("kris-core is Shift Report's shared client, unchanged (when that copy is on this machine)", () => {

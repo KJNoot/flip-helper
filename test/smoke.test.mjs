@@ -1164,6 +1164,67 @@ try {
   });
 
 
+  await step("v0.9.1 Kris turns on by herself: invite-only button, cookie copy, iPhone manifest, notify asked once", async () => {
+    const kBase = `http://127.0.0.1:${srv.address().port}/index.html?nosw&nointro&nowalk&noterms`;
+    const krisHits = [];
+    const fresh = async ({ cookie, init } = {}) => {
+      const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true,
+        userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" });
+      if (cookie) await ctx2.addCookies([{ name: "flipkris", value: cookie, url: `http://127.0.0.1:${srv.address().port}/` }]);
+      const pg = await ctx2.newPage();
+      pg.on("pageerror", e => { errors.push("pageerror v091: " + e.message); console.log("  v091 page error:", e.message); });
+      await pg.route("https://kris-chat.kens-remi.workers.dev/**", r => { krisHits.push("REAL"); return r.abort(); });
+      await pg.route("https://fake-kris.test/**", r => { krisHits.push(JSON.parse(r.request().postData() || "{}")); return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ reply: "Okay!", actions: [{ type: "reminder", at: "2030-01-01T09:00", text: "Ship it" }] }) }); });
+      await pg.addInitScript(extra => {
+        window.__KRIS_URL = "https://fake-kris.test"; window.__flipQuiet = true;
+        window.__permAsks = 0;
+        window.Notification = class { constructor() {} static get permission() { return window.__perm || "default"; } static async requestPermission() { window.__permAsks++; window.__perm = "denied"; return "denied"; } };
+        try { localStorage.setItem("flip-helper.introDone", "1"); localStorage.setItem("flip-helper.walkthroughDone", "1"); if (extra) for (const [k, v] of Object.entries(extra)) localStorage.setItem(k, v); } catch (e) {}
+      }, init || null);
+      return { ctx2, pg };
+    };
+
+    // 1. a public visitor: no button, nothing sent
+    let { ctx2, pg } = await fresh();
+    await pg.goto(kBase); await pg.waitForSelector("html[data-ready='1']");
+    assert.equal(await pg.$("#kris-fab"), null);
+    await ctx2.close();
+
+    // 2. her invited phone before the code arrives: the button shows a friendly "almost ready" card, no chat box
+    ({ ctx2, pg } = await fresh({ init: { "flip-helper.inviteSeen": "1" } }));
+    await pg.goto(kBase); await pg.waitForSelector("#kris-fab");
+    await pg.click("#kris-fab");
+    await pg.waitForSelector("#kris-code-card");
+    assert.match(await pg.textContent("#kris-code-card"), /almost ready/i);
+    assert.equal(await pg.$("#kris-text"), null, "no chat box without a code, so nothing can reach the server");
+    await ctx2.close();
+
+    // 3. a Home Screen app that got Safari's cookie (iOS 17.2+): Kris is on at first launch, no typing
+    ({ ctx2, pg } = await fresh({ cookie: "FS-COOKIECODE1234" }));
+    await pg.goto(kBase); await pg.waitForSelector("#kris-fab");
+    assert.equal(await pg.evaluate(() => localStorage.getItem("flip-helper.kris.code")), "FS-COOKIECODE1234");
+    assert.equal(await pg.evaluate(() => window.__permAsks), 0, "no notification prompt on launch");
+    // the iPhone Safari page now offers a manifest whose start_url carries the code (for Add to Home Screen)
+    await pg.waitForFunction(() => /^blob:/.test(document.querySelector('link[rel="manifest"]').href));
+    const man = await pg.evaluate(async () => (await fetch(document.querySelector('link[rel="manifest"]').href)).json());
+    assert.match(man.start_url, /\/index\.html#kris=FS-COOKIECODE1234$/);
+    assert.match(man.id, /^http:\/\/127\.0\.0\.1:\d+\/$/);
+    assert.equal(man.display, "standalone");
+    // first reminder asks once; the second doesn't ask again
+    await pg.click("#kris-fab");
+    for (let i = 0; i < 2; i++) {
+      await pg.fill("#kris-text", "remind me " + i);
+      await pg.click("#kris-send");
+      await pg.waitForFunction(n => document.querySelectorAll('.kris-card[data-type="reminder"] .kris-apply').length > 0 && document.querySelectorAll('.kris-card[data-type="reminder"]').length === n, i + 1);
+      await pg.locator('.kris-card[data-type="reminder"] .kris-apply').last().click();
+      await pg.waitForFunction(n => document.querySelectorAll('.kris-card[data-type="reminder"] .kris-ok').length === n, i + 1);
+    }
+    assert.equal(await pg.evaluate(() => window.__permAsks), 1, "asked exactly once, on the first reminder");
+    await ctx2.close();
+    assert.ok(!krisHits.includes("REAL"));
+    assert.equal(krisHits.filter(x => x !== "REAL").length, 2);
+  });
+
   await step("v0.7.0 studio photo: real U²-Netp model, sheet UI, and a 12MP timing run", async () => {
     const p7 = await context.newPage();
     p7.setDefaultTimeout(120000);

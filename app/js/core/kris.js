@@ -19,6 +19,14 @@ export const KV_PREFIX = "flip-helper.kris.kv.";
 // What Kris remembers, recent chat topics, reminders and expenses. These ride along with
 // "Sync with my computer" when it is on (the kv table). The code and the chat log do not.
 export const SYNC_NAMES = ["krisFacts", "krisTopics", "krisReminders", "krisExpenses"];
+// v0.9.1: her code also rides along in her own sync data, so a paired device turns Kris on by itself.
+export const ACCESS_NAME = "krisAccess";
+export const CODE_AT_KEY = "flip-helper.kris.codeAt";
+// A code this device must not pick up again by itself (turned off here, or the server said it's no good).
+export const NO_AUTO_KEY = "flip-helper.kris.noAuto";
+export const NOTIFY_ASKED_KEY = "flip-helper.kris.notifyAsked";
+// iPhone copies a site's cookies (not its storage) into a Home Screen app when she adds it (iOS 17.2+).
+export const COOKIE_NAME = "flipkris";
 export const CLOUD_PREFIX = "kris:";
 export const LOG_MAX = 40;
 
@@ -36,15 +44,71 @@ export function getCode(storage) {
   const s = ls(storage); if (!s) return "";
   try { return normalizeCode(s.getItem(CODE_KEY) || ""); } catch (e) { return ""; }
 }
-export function setCode(raw, storage) {
+/** She (or her link) set the code on purpose: save it, and clear any "don't pick this up" marker. */
+export function setCode(raw, storage, at = Date.now()) {
   const s = ls(storage), c = normalizeCode(raw);
   if (!s || !isPlausibleCode(c)) return "";
-  try { s.setItem(CODE_KEY, c); } catch (e) { return ""; }
+  try { s.setItem(CODE_KEY, c); s.setItem(CODE_AT_KEY, String(at)); s.removeItem(NO_AUTO_KEY); } catch (e) { return ""; }
   return c;
 }
+export function codeAt(storage) {
+  const s = ls(storage); if (!s) return 0;
+  try { return Number(s.getItem(CODE_AT_KEY)) || 0; } catch (e) { return 0; }
+}
+/** Remove the code from this device. It won't come back by itself (cookie or sync) unless she sets it again. */
 export function clearCode(storage) {
   const s = ls(storage); if (!s) return;
-  try { s.removeItem(CODE_KEY); } catch (e) { }
+  try { const c = s.getItem(CODE_KEY); if (c) s.setItem(NO_AUTO_KEY, normalizeCode(c)); s.removeItem(CODE_KEY); s.removeItem(CODE_AT_KEY); } catch (e) { }
+}
+/** A code found by itself (cookie, sync): take it only if this device has none and hasn't turned that code away. */
+export function adoptCode(raw, storage, at = Date.now()) {
+  const s = ls(storage), c = normalizeCode(raw);
+  if (!s || !isPlausibleCode(c) || getCode(s)) return "";
+  try { if (s.getItem(NO_AUTO_KEY) === c) return ""; s.setItem(CODE_KEY, c); s.setItem(CODE_AT_KEY, String(at)); } catch (e) { return ""; }
+  return c;
+}
+
+// ---------- carrying the code into an installed app (cookie + manifest) ----------
+export function codeFromCookie(cookieStr = "") {
+  const m = new RegExp("(?:^|;\\s*)" + COOKIE_NAME + "=([A-Za-z0-9-]+)").exec(String(cookieStr || ""));
+  const c = m ? normalizeCode(m[1]) : "";
+  return isPlausibleCode(c) ? c : "";
+}
+export function codeCookie(code, path = "/", maxAgeDays = 400) {
+  const c = normalizeCode(code);
+  if (!isPlausibleCode(c)) return COOKIE_NAME + "=; Path=" + path + "; Max-Age=0; Secure; SameSite=Strict";
+  return COOKIE_NAME + "=" + c + "; Path=" + path + "; Max-Age=" + Math.round(maxAgeDays * 86400) + "; Secure; SameSite=Strict";
+}
+/** The app's folder, e.g. "/flip-helper/" for "/flip-helper/index.html". */
+export function appPath(pathname = "/") {
+  const p = String(pathname || "/");
+  return p.endsWith("/") ? p : p.slice(0, p.lastIndexOf("/") + 1) || "/";
+}
+/**
+ * A copy of the app's manifest whose start_url carries her code (#kris=…, a hash so it is never sent to the
+ * web server). Every address is absolute because a blob: manifest has no folder of its own; the id stays the
+ * same so it is still the same app.
+ */
+export function krisManifest(base = {}, { pageUrl, manifestUrl, code } = {}) {
+  const c = normalizeCode(code);
+  const abs = u => new URL(u, manifestUrl || pageUrl).href;
+  const out = { ...base };
+  out.id = abs(base.id || base.start_url || "./");
+  out.scope = abs(base.scope || "./");
+  out.start_url = abs(base.start_url || "./") .split("#")[0] + (isPlausibleCode(c) ? "#kris=" + c : "");
+  out.icons = (base.icons || []).map(i => ({ ...i, src: abs(i.src) }));
+  return out;
+}
+export function isIOSDevice({ ua = "", platform = "", maxTouchPoints = 0 } = {}) {
+  return /iPhone|iPad|iPod/i.test(ua) || (platform === "MacIntel" && maxTouchPoints > 1);
+}
+export function isStandaloneDisplay(win) {
+  try { return !!((win.navigator && win.navigator.standalone) || (win.matchMedia && win.matchMedia("(display-mode: standalone)").matches)); } catch (e) { return false; }
+}
+/** Ask for notification permission once ever: the first time she sets a reminder. */
+export function shouldAskNotify(storage) {
+  const s = ls(storage); if (!s) return false;
+  try { if (s.getItem(NOTIFY_ASKED_KEY)) return false; s.setItem(NOTIFY_ASKED_KEY, String(Date.now())); return true; } catch (e) { return false; }
 }
 
 /** The code from a private setup link: ...flip-helper/#kris=CODE (also #/home?kris=CODE or ?kris=CODE). */
@@ -57,11 +121,13 @@ export function codeFromUrl(hash = "", search = "") {
   return isPlausibleCode(c) ? c : "";
 }
 /** Store the code from the link, then strip it from the address bar so it isn't left in history or a bookmark. */
-export function takeSetupLink(loc, hist, storage) {
+// respectNoAuto: an installed app started from its icon (start_url carries #kris=…) must not undo
+// "Turn off Kris on this device" or bring back a code the server turned down.
+export function takeSetupLink(loc, hist, storage, { respectNoAuto = false } = {}) {
   try {
     const code = codeFromUrl(loc.hash, loc.search);
     if (!code) return false;
-    setCode(code, storage);
+    if (respectNoAuto) adoptCode(code, storage); else setCode(code, storage);
     const search = String(loc.search || "").replace(/([?&])kris=[A-Za-z0-9-]*&?/, "$1").replace(/[?&]$/, "");
     const clean = String(loc.pathname || "") + search + "#/home";
     if (hist && hist.replaceState) hist.replaceState(null, "", clean);
@@ -96,11 +162,24 @@ export function krisKvSnapshot(storage) {
       out[CLOUD_PREFIX + name] = { key: CLOUD_PREFIX + name, payload: { v: o.v }, updatedAt: Number(o.updatedAt) || 0 };
     } catch (e) { }
   }
+  const code = getCode(s);
+  if (code) out[CLOUD_PREFIX + ACCESS_NAME] = { key: CLOUD_PREFIX + ACCESS_NAME, payload: { v: [code] }, updatedAt: codeAt(s) || 1 };
   return out;
 }
 /** For sync: apply the other device's newer copy. Ignores anything that isn't one of the four lists. */
 export function applyKrisKv(key, payload, updatedAt, storage) {
   const name = String(key || "").startsWith(CLOUD_PREFIX) ? String(key).slice(CLOUD_PREFIX.length) : "";
+  if (name === ACCESS_NAME) {
+    // Her code from another of her devices: take it if this one has none (and didn't turn it away),
+    // or replace an older code with a newer one.
+    const c = payload && Array.isArray(payload.v) ? normalizeCode(payload.v[0]) : "";
+    const s = ls(storage);
+    if (!s || !isPlausibleCode(c)) return false;
+    const mine = getCode(s), t = Number(updatedAt) || Date.now();
+    if (!mine) return adoptCode(c, s, t) ? "access" : false;
+    if (mine !== c && t > codeAt(s)) { try { if (s.getItem(NO_AUTO_KEY) === c) return false; s.setItem(CODE_KEY, c); s.setItem(CODE_AT_KEY, String(t)); } catch (e) { return false; } return "access"; }
+    return false;
+  }
   if (!SYNC_NAMES.includes(name) || !payload || !Array.isArray(payload.v)) return false;
   const s = ls(storage); if (!s) return false;
   try { s.setItem(KV_PREFIX + name, JSON.stringify({ v: payload.v, updatedAt: Number(updatedAt) || Date.now() })); } catch (e) { return false; }

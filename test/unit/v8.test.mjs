@@ -927,19 +927,19 @@ describe("v0.8.0 sync UI copy (pairing, no email form)", () => {
 });
 
 describe("v0.8.0 version and service worker", () => {
-  it("bumps the app to 0.9.0 and caches the sync modules", () => {
+  it("bumps the app to 0.9.1 and caches the sync modules", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.9.0");
+    assert.equal(pkg.version, "0.9.1");
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.9\.0"/);
+    assert.match(main, /export const VERSION = "0\.9\.1"/);
     assert.match(main, /queueSync/);
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.9\.0/);
+    assert.match(sw, /flip-helper-v0\.9\.1/);
     assert.match(sw, /js\/core\/sync\.js/);
     assert.match(sw, /js\/core\/sync-config\.js/);
     assert.match(sw, /js\/ui\/syncui\.js/);
     const readme = readFileSync(join(root, "README.md"), "utf8");
-    assert.match(readme, /0\.9\.0/);
+    assert.match(readme, /0\.9\.1/);
     assert.match(readme, /Sync with my computer/);
     assert.match(readme, /8-character/);
     assert.match(readme, /recovery code/);

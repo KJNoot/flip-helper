@@ -3,12 +3,13 @@
 // emails she sends herself, sets reminders, and offers one-tap fills for listings, item records and expenses.
 // Nothing is saved, sent or posted until she taps. Mirrors Shift Report's js/ask.js on top of kris-core.js.
 import { toast, download, confirmSheet } from "./dom.js";
-import { getAcceptance } from "../core/invite.js";
+import { getAcceptance, inviteSeen } from "../core/invite.js";
 import { fileToDataUrl, downscaleDataUrl } from "../core/draft.js";
 import {
   KrisCore, KRIS_URL, KRIS_APP_ID, KRIS_TITLE, getCode, setCode, clearCode, isPlausibleCode,
   createKrisStore, loadLog, saveLog, clearLog, krisContext, listingRows, makeListingItem, findItem, recordPlan,
-  normalizeExpense, expenseRows, smsHref, changeMailto, friendlyError, pickMode
+  normalizeExpense, expenseRows, smsHref, changeMailto, friendlyError, pickMode,
+  adoptCode, codeFromCookie, codeCookie, appPath, krisManifest, isIOSDevice, isStandaloneDisplay, shouldAskNotify
 } from "../core/kris.js";
 
 let C = null, K = null, panel = null, fab = null, busy = false, pending = null, rec = null, remTimer = null;
@@ -39,14 +40,60 @@ function firstName() {
   return a && a.name ? String(a.name).trim().split(/\s+/)[0] : "";
 }
 
-/** Show the button only on a device that has her code (from the setup link or typed in Settings), or with ?kris=1. */
+/**
+ * Her code reaches every copy of the app by itself (v0.9.1):
+ *  1. the link (#kris=…) is read on every launch, including when an installed app starts from it;
+ *  2. a first-party cookie holds the code, because iPhone copies cookies (not storage) into a Home Screen app
+ *     at the moment she adds it (iOS 17.2+); the app reads it on launch;
+ *  3. on iPhone Safari the page's manifest is swapped for a copy whose start_url carries #kris=…, so a Home
+ *     Screen app added from here starts with her code even without the cookie copy;
+ *  4. the code rides in her own sync data (kv), so any device paired with "Sync with my computer" gets it.
+ * Android Chrome needs none of the extras: an installed app shares Chrome's storage.
+ */
+export function bootKrisAccess(win = globalThis) {
+  try {
+    if (!getCode()) adoptCode(codeFromCookie(win.document.cookie));
+    const code = getCode();
+    if (!code) return "";
+    win.document.cookie = codeCookie(code, appPath(win.location.pathname));
+    const nav = win.navigator || {};
+    if (isIOSDevice({ ua: nav.userAgent || "", platform: nav.platform || "", maxTouchPoints: nav.maxTouchPoints || 0 }) && !isStandaloneDisplay(win)) swapManifest(code, win).catch(() => { });
+    return code;
+  } catch (e) { return getCode(); }
+}
+async function swapManifest(code, win = globalThis) {
+  const doc = win.document, link = doc.querySelector('link[rel="manifest"]');
+  if (!link || link.dataset.kris === code) return false;
+  const href = link.dataset.base || new URL(link.getAttribute("href"), win.location.href).href;
+  const base = await (await win.fetch(href)).json();
+  const m = krisManifest(base, { pageUrl: win.location.href, manifestUrl: href, code });
+  link.dataset.base = href;
+  link.dataset.kris = code;
+  link.setAttribute("href", win.URL.createObjectURL(new win.Blob([JSON.stringify(m)], { type: "application/manifest+json" })));
+  return true;
+}
+/** Remove her code from this device (and its cookie). It won't come back by itself unless she sets it again. */
+export function forgetCodeHere(win = globalThis) {
+  clearCode();
+  try { win.document.cookie = codeCookie("", appPath(win.location.pathname)); } catch (e) { }
+}
+
+/**
+ * Who sees the button: a device with her code, or one that opened her private invite (so it's her phone even
+ * if the code hasn't arrived yet; then it shows how to finish). Everyone else: no button, and the app never
+ * calls the Kris server without a code.
+ */
 export function krisEnabled() {
+  let flag = false;
   try {
     const q = new URLSearchParams(location.search).get("kris");
     if (q === "1") localStorage.setItem("flip-helper.kris.on", "1");
     if (q === "0") localStorage.removeItem("flip-helper.kris.on");
-    return !!getCode() || localStorage.getItem("flip-helper.kris.on") === "1";
-  } catch (e) { return !!getCode(); }
+    flag = localStorage.getItem("flip-helper.kris.on") === "1";
+  } catch (e) { }
+  let invited = false;
+  try { invited = inviteSeen(); } catch (e) { }
+  return !!getCode() || invited || flag;
 }
 
 export function mountKris(ctx) {
@@ -122,11 +169,12 @@ function quick(label, mode, text, photo) {
 export function codeCard(after) {
   const f = h("input", { class: "kris-input", id: "kris-code-in", placeholder: "Your code", autocapitalize: "characters", autocomplete: "off", spellcheck: "false", "aria-label": "Your Kris code" });
   return h("div", { class: "card kris-card", id: "kris-code-card" },
-    h("h3", null, "Enter your code (just once)"),
-    h("p", { class: "small muted" }, "KJ gives you this code. Type it once and this device remembers it."), f,
+    h("h3", null, "Kris is almost ready"),
+    h("p", { class: "small" }, "Tap your Kris link from KJ’s email and I’ll turn on by myself. If Sync with my computer is on, I also turn on here as soon as I’m set up on your other device."),
+    h("p", { class: "small muted" }, "Or type the code from that email once:"), f,
     h("button", { type: "button", class: "btn", id: "kris-code-save", style: "margin-top:10px", onclick: () => {
       if (!isPlausibleCode(f.value)) { toast("That code looks too short"); return; }
-      setCode(f.value); toast("Saved. Kris is ready!"); mountKris(C); if (after) after();
+      setCode(f.value); bootKrisAccess(); toast("Saved. Kris is ready!"); mountKris(C); if (after) after();
     } }, "Save my code"));
 }
 
@@ -234,7 +282,9 @@ function actionCard(m, a) {
     if (done) btns.append(okLine("Reminder set"));
     else btns.append(h("button", { type: "button", class: "btn sm kris-apply", onclick: async () => {
       const r = await core().addReminder(a); if (!r) { toast("I couldn’t read that time. Tell me again, like “at 4 PM”."); return; }
-      const p = await core().askNotify(); a.remId = r.id; mark("Reminder set");
+      // Notification permission is asked once ever, the first time she sets a reminder (never on launch).
+      const p = shouldAskNotify() ? await core().askNotify() : notifyState();
+      a.remId = r.id; mark("Reminder set");
       toast(p === "granted" ? "Set! I’ll pop up " + when + " if the app is open. For a sure alarm, tap Add to calendar." : "Set! You’ll see it here " + when + ". For a sure alarm, tap Add to calendar.");
     } }, "Set reminder"));
     btns.append(h("button", { type: "button", class: "btn sm soft", onclick: () => {
@@ -245,6 +295,8 @@ function actionCard(m, a) {
   card.append(btns);
   return card;
 }
+
+function notifyState() { try { return "Notification" in globalThis ? Notification.permission : "unsupported"; } catch (e) { return "unsupported"; } }
 
 // ---------- reminders: checked while the app is open; a phone notification only if she allowed it ----------
 function startReminders() {
@@ -298,7 +350,7 @@ async function memorySheet() {
     } }, "Forget everything and clear the chat"),
     h("button", { type: "button", class: "btn soft", id: "kris-remove-code", style: "margin-top:8px", onclick: async () => {
       if (!(await confirmSheet({ title: "Turn off Kris on this device?", body: "This removes your code from this device. You can type it again any time in Settings → Ask Kris.", ok: "Turn off" }))) return;
-      clearCode(); sheet.remove(); closeKris(); mountKris(C); toast("Kris is off on this device.");
+      forgetCodeHere(); sheet.remove(); closeKris(); mountKris(C); toast("Kris is off on this device.");
     } }, "Turn off Kris on this device"));
   sheet.append(h("div", { class: "kris-head" }, h("button", { type: "button", class: "btn sm soft", id: "kris-mem-close", onclick: () => sheet.remove() }, "‹ Back"), h("div", { class: "kris-title" }, "Kris remembers"), h("span", { class: "kris-spacer" })), body);
   document.body.append(sheet);
@@ -348,7 +400,7 @@ async function sendChat(ta) {
     const context = krisContext({ items: C.items || [], screen: C.screen, openItem: openItemFromHash(), name: firstName(), expenses });
     const r = await core().ask({ text, image: img || null, mode, log: prior, context, app: { id: KRIS_APP_ID, version: C.version || "", view: C.screen || "" } });
     wait.remove();
-    if (!r.ok) { if (r.error === "code") clearCode(); push({ who: "note", text: friendlyError(r.error) }); return; }
+    if (!r.ok) { if (r.error === "code") forgetCodeHere(); push({ who: "note", text: friendlyError(r.error) }); return; }
     let remembered = [];
     for (const a of r.actions.filter(a => a.type === "remember")) remembered = remembered.concat(await core().addFacts(a.facts || []));
     for (const a of r.actions.filter(a => a.type === "forget")) { const n = await core().forget(a.match); if (n) toast("Forgot " + n + " thing" + (n > 1 ? "s" : "") + "."); }
@@ -362,4 +414,4 @@ async function sendChat(ta) {
 }
 
 // For tests only.
-export const __kris = { log, checkReminders, core: () => core() };
+export const __kris = { log, checkReminders, core: () => core(), bootKrisAccess, swapManifest };

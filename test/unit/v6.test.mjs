@@ -555,11 +555,11 @@ describe("guide, walkthrough, version, and privacy", () => {
 
   it("bumps the app, package, and service worker to v0.8.0 and caches the new modules", () => {
     const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.9.0");
+    assert.equal(pkg.version, "0.9.1");
     const main = readFileSync(join(APP, "js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.9\.0"/);
+    assert.match(main, /export const VERSION = "0\.9\.1"/);
     const sw = readFileSync(join(APP, "sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.9\.0/);
+    assert.match(sw, /flip-helper-v0\.9\.1/);
     assert.match(sw, /js\/core\/secondlook\.js/);
     assert.match(sw, /js\/ui\/screens\/secondlook\.js/);
     assert.doesNotMatch(sw, /media\/intro\.mp4/);

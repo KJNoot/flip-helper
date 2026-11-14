@@ -556,13 +556,13 @@ describe("v0.7.4 startLookDeeper updates a scan and can merge a load", () => {
 });
 
 describe("v0.7.4 wiring, UI, version, and service worker", () => {
-  it("bumps the app to 0.9.0, caches lookdeeper.js, and wires a Look deeper button", () => {
+  it("bumps the app to 0.9.1, caches lookdeeper.js, and wires a Look deeper button", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.9.0");
+    assert.equal(pkg.version, "0.9.1");
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.9\.0"/);
+    assert.match(main, /export const VERSION = "0\.9\.1"/);
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.9\.0/);
+    assert.match(sw, /flip-helper-v0\.9\.1/);
     assert.match(sw, /js\/core\/lookdeeper\.js/);
     assert.doesNotMatch(sw, /\.onnx/);
     const ui = readFileSync(join(root, "app/js/ui/screens/secondlook.js"), "utf8");
@@ -580,7 +580,7 @@ describe("v0.7.4 wiring, UI, version, and service worker", () => {
     assert.equal(LOOK_DEEPER_OVERLAP, 0.10);
     assert.ok(LOOK_DEEPER_MAX_PHOTOS >= 10);
     const readme = readFileSync(join(root, "README.md"), "utf8");
-    assert.match(readme, /0\.9\.0/);
+    assert.match(readme, /0\.9\.1/);
     assert.match(readme, /Look deeper/);
     assert.match(MSG_NEED_PHOTO, /scan this photo again/);
     assert.match(REFINE_SYSTEM, /Exclude floor/);
