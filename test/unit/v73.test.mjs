@@ -223,16 +223,16 @@ describe("v0.7.4 portrait blur, crop, and no upscale", () => {
 });
 
 describe("v0.7.4 wiring: Enhance is the default, white cutout is secondary", () => {
-  it("bumps the app to 0.8.0 and caches enhance.js", () => {
+  it("bumps the app to 0.9.0 and caches enhance.js", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.8.0");
+    assert.equal(pkg.version, "0.9.0");
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.8\.0"/);
+    assert.match(main, /export const VERSION = "0\.9\.0"/);
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.8\.0/);
+    assert.match(sw, /flip-helper-v0\.9\.0/);
     assert.match(sw, /js\/core\/enhance\.js/);
     const readme = readFileSync(join(root, "README.md"), "utf8");
-    assert.match(readme, /0\.8\.0/);
+    assert.match(readme, /0\.9\.0/);
     assert.match(readme, /Enhance/);
   });
 

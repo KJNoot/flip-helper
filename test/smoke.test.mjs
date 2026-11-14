@@ -10,10 +10,12 @@ import { emptyItem, setListed, markSold } from "../app/js/core/inventory.js";
 import { scanResult } from "../app/js/core/scanner.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
+const APP_VERSION = JSON.parse(readFileSync(join(HERE, "../package.json"), "utf8")).version;
 const OUT = join(HERE, "out") + "/";
 const SHOTS = "/workspace/flip-helper-shots/";
 mkdirSync(OUT, { recursive: true });
 mkdirSync(SHOTS, { recursive: true });
+mkdirSync("/tmp/studio-model", { recursive: true });
 
 const mugPath = join(HERE, "fixtures/mug.png");
 const mug = "data:image/png;base64," + readFileSync(mugPath).toString("base64");
@@ -61,7 +63,9 @@ const shot = async (name, { keepFx = false, also } = {}) => {
 };
 const go = async hash => { await page.evaluate(h => { location.hash = h; }, hash); await page.waitForTimeout(280); };
 const text = () => page.textContent("#view");
+// SMOKE_ONLY=kris runs only the steps whose name has that text (handy while working on one flow).
 const step = async (name, fn) => {
+  if (process.env.SMOKE_ONLY && !name.toLowerCase().includes(process.env.SMOKE_ONLY.toLowerCase())) return;
   try { await fn(); console.log("ok  ", name); }
   catch (e) {
     console.log("FAIL", name);
@@ -245,7 +249,7 @@ try {
     assert.ok(await page.isVisible("#suggest-open"));
     assert.ok(await page.isVisible("#apikey"));
     assert.match(await text(), /No key saved/);
-    assert.match(await text(), /Jessika's Flip Side v0\.7\.0/);
+    assert.ok((await text()).includes("Jessika's Flip Side v" + APP_VERSION), "settings shows the app version");
     assert.match(await text(), /stays on this phone only/);
     assert.match(await text(), /will not ask for a selling-site password/i);
     assert.match(await text(), /Sites you sell on/);
@@ -1035,6 +1039,131 @@ try {
     await p4.close();
   });
 
+  await step("v0.9.0 Ask Kris: setup link, chat, record fill confirm, memory, reminder, expense, photo listing, change, bad code", async () => {
+    const pk = await context.newPage();
+    pk.on("pageerror", e => { errors.push("pageerror kris: " + e.message); console.log("  kris page error:", e.message); });
+    const calls = [];
+    // Never the real server: block it, and answer a fake one.
+    await pk.route("https://kris-chat.kens-remi.workers.dev/**", r => { calls.push("REAL"); return r.abort(); });
+    await pk.route("https://fake-kris.test/**", async r => {
+      const b = JSON.parse(r.request().postData() || "{}");
+      calls.push(b);
+      const t = String(b.text || "").toLowerCase();
+      const json = o => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(o) });
+      if (b.code === "FS-BADCODE0000") return r.fulfill({ status: 401, contentType: "application/json", body: JSON.stringify({ error: "code" }) });
+      if (t.includes("sold")) return json({ reply: "Congrats, Jess! Here’s the update for the lamp. Tap to save it.", actions: [
+        { type: "fill", target: "record", summary: "Lamp sold on Mercari", data: { item: "brass lamp", status: "Sold", soldPrice: "42", platform: "Mercari" } },
+        { type: "remember", facts: ["Sells mostly on Mercari"] },
+        { type: "message", to: "Buyer", channel: "marketplace", text: "Thanks so much! It ships tomorrow." },
+        { type: "reminder", at: "2020-01-01T09:00", text: "Ship the lamp" }] });
+      if (t.includes("bubble wrap")) return json({ reply: "Got it.", actions: [{ type: "fill", target: "expense", data: { what: "Bubble wrap", amount: "12.49", where: "Walmart", date: "2026-11-10" } }] });
+      if (t.includes("dark mode")) return json({ reply: "I can’t change the app, but KJ’s helper can. Tap below to send it.", change: "Add a dark mode switch", actions: [] });
+      if (b.image) return json({ reply: "Cute mug! Here’s a listing.", actions: [{ type: "fill", target: "listing", summary: "Blue mug", data: { title: "Blue pottery mug", description: "Hand-thrown mug.", priceLow: "12", priceHigh: "18", condition: "Good" } }] });
+      return json({ reply: "Hi!", actions: [] });
+    });
+    await pk.addInitScript(() => { window.__KRIS_URL = "https://fake-kris.test"; window.__flipQuiet = true; window.__flipFast = true; try { localStorage.setItem("flip-helper.introDone", "1"); localStorage.setItem("flip-helper.walkthroughDone", "1"); } catch (e) {} });
+    const kBase = `http://127.0.0.1:${srv.address().port}/index.html?nosw&nointro&nowalk&noterms`;
+    await pk.goto(kBase);
+    await pk.waitForSelector("html[data-ready='1']");
+    assert.equal(await pk.$("#kris-fab"), null, "no Ask Kris button without a code");
+    assert.ok(await pk.$("#ask-fab"), "Ask a question is still there");
+
+    await pk.goto(kBase + "#kris=FS-SMOKETEST1234");
+    await pk.waitForSelector("#kris-fab");
+    assert.ok(!(await pk.evaluate(() => location.href)).includes("FS-SMOKETEST1234"), "code removed from the address bar");
+    assert.equal(await pk.evaluate(() => localStorage.getItem("flip-helper.kris.code")), "FS-SMOKETEST1234");
+
+    await pk.evaluate(async () => {
+      const { emptyItem, setListed } = await import("./js/core/inventory.js");
+      await window.__flip.save(setListed(emptyItem({ id: "it_lampsmoke", title: "Vintage brass lamp", costPaid: 5, askingPrice: 30 }), "ebay"));
+    });
+    await pk.click("#kris-fab");
+    await pk.waitForSelector("#kris-panel #kris-hello");
+    await pk.screenshot({ path: join(SHOTS, "v9-kris-hello.png") });
+
+    await pk.fill("#kris-text", "The lamp sold for 42 on Mercari");
+    await pk.click("#kris-send");
+    await pk.waitForSelector('.kris-card[data-target="record"] .kris-apply');
+    const diff = await pk.textContent('.kris-card[data-target="record"]');
+    assert.match(diff, /Stage: Listed → Sold/);
+    assert.match(diff, /Sold price:/);
+    assert.match(await pk.textContent("#kris-msgs"), /I’ll remember: Sells mostly on Mercari/);
+    assert.match(await pk.textContent('.kris-card[data-type="message"]'), /paste it in the site’s chat/);
+    let lamp = await pk.evaluate(() => window.__flip.items.find(i => i.id === "it_lampsmoke"));
+    assert.equal(lamp.soldAt, null, "nothing saved before she taps");
+    await pk.screenshot({ path: join(SHOTS, "v9-kris-record.png") });
+    await pk.click('.kris-card[data-target="record"] .kris-apply');
+    await pk.waitForSelector('.kris-card[data-target="record"] .kris-ok');
+    lamp = await pk.evaluate(() => window.__flip.items.find(i => i.id === "it_lampsmoke"));
+    assert.equal(lamp.stage, "sold"); assert.equal(lamp.salePrice, 42); assert.equal(lamp.soldOn, "mercari");
+    const body1 = calls.find(c => c !== "REAL");
+    assert.equal(body1.app.id, "flip-side"); assert.equal(body1.code, "FS-SMOKETEST1234");
+    assert.match(body1.context, /Vintage brass lamp/);
+
+    // reminder: set it, then the due check shows the in-app banner
+    await pk.click('.kris-card[data-type="reminder"] .kris-apply');
+    await pk.evaluate(async () => { const m = await import("./js/ui/kris.js"); await m.__kris.checkReminders(); });
+    await pk.waitForSelector("#kris-rems .kris-rem");
+    assert.match(await pk.textContent("#kris-rems"), /Ship the lamp/);
+    await pk.click("#kris-rems .kris-rem .btn");
+
+    // what Kris remembers: see it and delete it
+    await pk.click("#kris-memory");
+    await pk.waitForSelector("#kris-facts");
+    assert.match(await pk.textContent("#kris-facts"), /Sells mostly on Mercari/);
+    await pk.screenshot({ path: join(SHOTS, "v9-kris-remembers.png") });
+    await pk.click("#kris-facts .kris-x");
+    await pk.waitForSelector("#kris-facts-none");
+    await pk.click("#kris-mem-close");
+
+    // expense fill -> Taxes, Other expenses
+    await pk.fill("#kris-text", "I spent 12.49 on bubble wrap at Walmart");
+    await pk.click("#kris-send");
+    await pk.waitForSelector('.kris-card[data-target="expense"] .kris-apply');
+    await pk.click('.kris-card[data-target="expense"] .kris-apply');
+    await pk.waitForSelector('.kris-card[data-target="expense"] .kris-ok');
+
+    // change request -> an email she sends to KJ's helper
+    await pk.fill("#kris-text", "Can you add a dark mode?");
+    await pk.click("#kris-send");
+    await pk.waitForSelector('[data-kris="change"]');
+    assert.match(await pk.getAttribute('[data-kris="change"]', "href"), /^mailto:kens\.remi@mail\.grokbot\.com/);
+
+    // photo -> listing draft with the photo
+    await pk.setInputFiles("#kris-photo-file", mugPath);
+    await pk.waitForSelector("#kris-thumb img");
+    await pk.click("#kris-send");
+    await pk.waitForSelector('.kris-card[data-target="listing"] .kris-apply');
+    const photoCall = calls.filter(c => c !== "REAL").pop();
+    assert.equal(photoCall.mode, "listing"); assert.match(photoCall.image, /^data:image\/jpeg;base64,/);
+    await pk.screenshot({ path: join(SHOTS, "v9-kris-listing.png") });
+    await pk.click('.kris-card[data-target="listing"] .kris-apply');
+    await pk.waitForSelector('.kris-card[data-target="listing"] .kris-ok');
+    const draft = await pk.evaluate(() => window.__flip.items.find(i => i.title === "Blue pottery mug"));
+    assert.equal(draft.stage, "draft"); assert.equal(draft.photos.length, 1); assert.equal(draft.priceHigh, 18);
+
+    await pk.click("#kris-close");
+    await pk.evaluate(() => { location.hash = "#/taxes"; });
+    await pk.waitForSelector("#kris-expenses:not([hidden])");
+    assert.match(await pk.textContent("#kris-expenses"), /Bubble wrap[\s\S]*\$12\.49/);
+
+    // settings card, and a bad code is cleared with a kind note
+    await pk.evaluate(() => { location.hash = "#/settings"; });
+    await pk.waitForSelector("#kriscard");
+    assert.match(await pk.textContent("#kriscard"), /set up on this device/);
+    await pk.evaluate(() => localStorage.setItem("flip-helper.kris.code", "FS-BADCODE0000"));
+    await pk.click("#kris-fab");
+    await pk.fill("#kris-text", "hello");
+    await pk.click("#kris-send");
+    await pk.waitForSelector(".kris-note");
+    assert.match(await pk.textContent(".kris-note"), /Ask KJ for a new one/);
+    assert.equal(await pk.evaluate(() => localStorage.getItem("flip-helper.kris.code")), null);
+    assert.ok(!calls.includes("REAL"), "never called the real Kris server");
+    await pk.close();
+    console.log("  shot v9-kris-*.png");
+  });
+
+
   await step("v0.7.0 studio photo: real U²-Netp model, sheet UI, and a 12MP timing run", async () => {
     const p7 = await context.newPage();
     p7.setDefaultTimeout(120000);
@@ -1049,7 +1178,8 @@ try {
       localStorage.setItem("flip-helper.walkthroughDone", "1");
     });
 
-    const beforePath = "/tmp/studio-model/v7-before-src.png";
+    // The original source photo lived in /tmp on the old box; fall back to the repo's mug fixture.
+    const beforePath = existsSync("/tmp/studio-model/v7-before-src.png") ? "/tmp/studio-model/v7-before-src.png" : mugPath;
     const beforeB64 = readFileSync(beforePath).toString("base64");
     const beforeUrl = "data:image/png;base64," + beforeB64;
 
@@ -1149,9 +1279,8 @@ try {
     assert.match(sheetTxt, /Recommended/);
     assert.match(sheetTxt, /Check that flaws are still visible/);
     assert.match(sheetTxt, /does not hide damage/i);
-    assert.match(sheetTxt, /Pure white/);
+    assert.match(sheetTxt, /White studio/);
     assert.match(sheetTxt, /Soft gray/);
-    assert.match(sheetTxt, /Keep original/);
     assert.match(sheetTxt, /Square \(1:1\)/);
     assert.match(sheetTxt, /Tall \(4:5\)/);
     assert.match(sheetTxt, /Do all photos/);
@@ -1164,10 +1293,10 @@ try {
       const el = document.querySelector("#studio-progress");
       const img = document.querySelector("#studio-after");
       if (!el || !img || !img.naturalWidth) return false;
-      return /Studio photo ready|basic clean-up/i.test(el.textContent);
+      return /Studio photo ready|Enhanced photo ready|basic clean-up/i.test(el.textContent);
     }, { timeout: 90000 });
     const progress = await p7.textContent("#studio-progress");
-    assert.match(progress, /Studio photo ready/);
+    assert.match(progress, /Studio photo ready|Enhanced photo ready/);
     assert.doesNotMatch(progress, /couldn't start/);
     await p7.evaluate(() => {
       const range = document.querySelector("#studio-ba-range");

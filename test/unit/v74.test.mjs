@@ -317,16 +317,16 @@ describe("v0.7.4 request and runLookDeeper wiring", () => {
 });
 
 describe("v0.7.4 wiring, UI, version, and service worker", () => {
-  it("bumps the app to 0.8.0 and caches locate.js", () => {
+  it("bumps the app to 0.9.0 and caches locate.js", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
-    assert.equal(pkg.version, "0.8.0");
+    assert.equal(pkg.version, "0.9.0");
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
-    assert.match(main, /export const VERSION = "0\.8\.0"/);
+    assert.match(main, /export const VERSION = "0\.9\.0"/);
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.match(sw, /flip-helper-v0\.8\.0/);
+    assert.match(sw, /flip-helper-v0\.9\.0/);
     assert.match(sw, /js\/core\/locate\.js/);
     const readme = readFileSync(join(root, "README.md"), "utf8");
-    assert.match(readme, /0\.8\.0/);
+    assert.match(readme, /0\.9\.0/);
     assert.match(readme, /labeled grid/);
     assert.match(LOOK_DEEPER_NOTE, /five cents/);
     assert.equal(LOCATE_MODEL, "gpt-4o");

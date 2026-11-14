@@ -24,6 +24,8 @@ import { tip, openTip } from "../tips.js";
 import { PHOTO_CLEANUP_NOTE } from "../../core/photo.js";
 import { STUDIO_NOTE, STUDIO_BUTTON } from "../../core/studio.js";
 import { syncCardShell, bindSyncCard } from "../syncui.js";
+import { getCode, setCode, clearCode, isPlausibleCode } from "../../core/kris.js";
+import { mountKris, openKris } from "../kris.js";
 
 export function renderSettings(ctx, el) {
   const n = ctx.items.length;
@@ -46,6 +48,22 @@ export function renderSettings(ctx, el) {
         <button type="button" class="btn soft sm" data-act="checkkey">Check key</button>
         <button type="button" class="btn dangerghost sm" data-act="removekey">Remove key</button>
       </div>
+    </div>
+
+    <div class="card" id="kriscard">
+      <div class="row between"><h3>Ask Kris</h3>${honesty("ok", "Working")}</div>
+      <p class="small">Kris is your reselling helper. She can write a listing from a photo, help you price things and answer buyers, keep your records and expenses, and remind you of things. She never sends or saves anything until you tap.</p>
+      ${getCode()
+        ? `<p class="tiny muted" id="kris-status">Kris is set up on this device.</p>
+      <div class="row wrap" style="margin-top:8px;gap:6px">
+        <button type="button" class="btn sm" data-act="krisopen">Open Kris</button>
+        <button type="button" class="btn dangerghost sm" data-act="krisoff">Turn off on this device</button>
+      </div>`
+        : `<label class="field"><span>Your Kris code (KJ gives you this)</span>
+        <input id="kris-code-settings" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="Type it once">
+      </label>
+      <p class="tiny muted" id="kris-status">You only type it once. It stays on this device.</p>
+      <button type="button" class="btn soft sm" data-act="kriscode" style="margin-top:8px">Save my code</button>`}
     </div>
 
     ${syncCardShell()}
@@ -242,6 +260,22 @@ export function renderSettings(ctx, el) {
 
   bind(el, {
     tip: b => openTip(b.dataset.tip || ""),
+    kriscode: () => {
+      const v = ($("#kris-code-settings", el) || {}).value || "";
+      if (!isPlausibleCode(v)) { toast("That code looks too short"); return; }
+      setCode(v);
+      mountKris(ctx);
+      toast("Saved. Tap Ask Kris any time.");
+      ctx.render();
+    },
+    krisopen: () => openKris(),
+    krisoff: async () => {
+      if (!(await confirmSheet({ title: "Turn off Kris on this device?", body: "This removes your code from this device. What Kris remembers stays, and you can type the code again any time.", ok: "Turn off" }))) return;
+      clearCode();
+      mountKris(ctx);
+      toast("Kris is off on this device");
+      ctx.render();
+    },
     pause: b => {
       const on = b.checked;
       setSettings({ pauseAutomation: on });

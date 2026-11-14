@@ -404,7 +404,7 @@ describe("column envelope drops clutter under a blade whose ends sit lower", () 
 });
 
 describe("v0.7.4 version", () => {
-  it("exports the new quality knobs and bumps the app to 0.8.0", () => {
+  it("exports the new quality knobs and bumps the app to 0.9.0", () => {
     assert.equal(STUDIO_ERODE_PX, 1);
     assert.ok(STUDIO_FEATHER_PX >= 1 && STUDIO_FEATHER_PX <= 2);
     assert.equal(STUDIO_EXPORT_EDGE, 2000);
@@ -412,8 +412,8 @@ describe("v0.7.4 version", () => {
     const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
     const main = readFileSync(join(root, "app/js/main.js"), "utf8");
     const sw = readFileSync(join(root, "app/sw.js"), "utf8");
-    assert.equal(pkg.version, "0.8.0");
-    assert.match(main, /export const VERSION = "0\.8\.0"/);
-    assert.match(sw, /flip-helper-v0\.8\.0/);
+    assert.equal(pkg.version, "0.9.0");
+    assert.match(main, /export const VERSION = "0\.9\.0"/);
+    assert.match(sw, /flip-helper-v0\.9\.0/);
   });
 });
