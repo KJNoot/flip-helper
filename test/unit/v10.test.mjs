@@ -177,3 +177,24 @@ describe("settings ride along with sync", () => {
     assert.equal((await st2.batches())[0].name, "Bins");
   });
 });
+
+describe("v0.10.1 app change requests go to the builder by her own email", async () => {
+  const { changeMailto, deviceName, CHANGE_TO, CHANGE_SUBJECT } = await import("../../app/js/core/kris.js");
+  it("addresses the builder with the right subject and every detail", () => {
+    const href = changeMailto({ request: "Please change my app: make the Depop button bigger, I keep missing it", summary: "Make the Write my Depop listing button bigger", version: "0.10.1", device: "iPhone · iOS 18.0 · Safari", label: "FS-99" });
+    assert.equal(CHANGE_TO, "kens.remi@mail.grokbot.com"); assert.equal(CHANGE_SUBJECT, "Flip Side change request");
+    assert.ok(href.startsWith("mailto:kens.remi@mail.grokbot.com?subject=Flip%20Side%20change%20request&body="));
+    const body = decodeURIComponent(href.split("&body=")[1]);
+    assert.match(body, /in my words:\nmake the Depop button bigger, I keep missing it/);
+    assert.ok(!/Please change my app/.test(body), "the quick-button prefix is dropped");
+    assert.match(body, /one-line summary:\nMake the Write my Depop listing button bigger/);
+    assert.match(body, /App version: 0\.10\.1/); assert.match(body, /Device: iPhone · iOS 18\.0 · Safari/); assert.match(body, /Kris code: FS-99/);
+  });
+  it("names the device from the browser", () => {
+    assert.equal(deviceName("Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1"), "iPhone · iOS 18.0 · Safari");
+    assert.equal(deviceName("Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36"), "Android phone · Android 14 · Chrome");
+  });
+  it("old saved replies (just a summary) still make a valid email", () => {
+    assert.match(decodeURIComponent(changeMailto({ text: "Add dark mode", version: "0.10.1" })), /summary:\nAdd dark mode[\s\S]*Kris code: unknown/);
+  });
+});

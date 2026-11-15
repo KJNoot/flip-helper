@@ -28,7 +28,7 @@ import { openTerms, closeTerms, isTermsOpen } from "./ui/terms.js";
 import { takeSetupLink, krisKvSnapshot, applyKrisKv, onKrisChange, isStandaloneDisplay } from "./core/kris.js";
 import { mountKris, openKris, closeKris, bootKrisAccess, openKrisTalk } from "./ui/kris.js";
 
-export const VERSION = "0.10.0";
+export const VERSION = "0.10.1";
 
 const view = $("#view");
 const store = await createStore();

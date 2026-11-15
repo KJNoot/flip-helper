@@ -12,7 +12,9 @@ On an iPhone: open that address in Safari, tap the Share button, then **Add to H
 
 One complete app from day one. There is no subscription in this test version, and no essential tool is locked behind an upgrade. The app is built so someone who is not used to computers can use it: big, clear buttons, one main action per screen, plain words, a first-open welcome and try-it demo, a short skippable walkthrough, a "?" on tricky controls, and advanced options behind "More" rather than removed.
 
-## What this version (0.10.0) does
+## What this version (0.10.1) does
+
+- **New in 0.10.1, app change requests through Kris:** when Jessika asks Kris to change the app or add a feature (not a listing or business task), Kris says she'll pass it to the builder and shows a one-tap card. It opens her mail app with an email to the builder (subject "Flip Side change request"): her request in her own words, Kris's one-line summary, the app version, the device and her Kris code label. She presses Send herself. Kris never changes the app.
 
 - **New in 0.10.0, Jessika's full vision (listing engine + business manager + strategist + hands-free Kris):**
   - **Dashboard** on Home: six big tiles: Start a listing, Find inventory, Needs attention, Review an offer, Financial snapshot, Talk to Kris. The older tools (Add an item, Buy or pass, Second look, Business manager) sit under "More tools".

@@ -187,8 +187,11 @@ function bubble(m) {
     m.text ? h("div", { class: "kris-txt" }, m.text) : null);
   if (m.who === "ai" && (m.remembered || []).length) b.append(h("div", { class: "kris-mem" }, "📌 I’ll remember: " + m.remembered.join(" · ")));
   if (m.who === "ai") (m.actions || []).forEach(a => { const c = actionCard(m, a); if (c) b.append(c); });
-  if (m.who === "ai" && m.change) b.append(h("div", { class: "kris-acts" },
-    h("a", { class: "btn sm", href: changeMailto({ text: m.change, version: C && C.version }), "data-kris": "change" }, "✉ Send this to KJ’s helper")));
+  if (m.who === "ai" && m.change) b.append(h("div", { class: "kris-card kris-change", "data-type": "change" },
+    h("div", { class: "kris-ct" }, "🛠 App change request"),
+    h("div", { class: "kris-pre" }, m.change),
+    h("p", { class: "tiny muted" }, "I can’t change the app myself. This opens your mail app with your request for the builder. You press Send."),
+    h("a", { class: "btn sm", href: changeMailto({ request: m.changeAsk || "", summary: m.change, version: C && C.version, label: m.label || "" }), "data-kris": "change" }, "✉ Send to the builder")));
   return b;
 }
 function push(m) {
@@ -410,7 +413,7 @@ async function sendChat(ta, { spoken = "" } = {}) {
     for (const a of r.actions.filter(a => a.type === "forget")) { const n = await core().forget(a.match); if (n) toast("Forgot " + n + " thing" + (n > 1 ? "s" : "") + "."); }
     const actions = r.actions.filter(a => a.type !== "remember" && a.type !== "forget");
     // The photo stays with this reply only while the app is open, so "Save as a draft" can keep it.
-    const msg = { who: "ai", text: r.reply || "", mode, actions, remembered, change: r.change ? [r.change, text].filter(Boolean).join("\n\nIn my words: ") : "" };
+    const msg = { who: "ai", text: r.reply || "", mode, actions, remembered, change: r.change || "", changeAsk: r.change ? String(text || "").slice(0, 2000) : "", label: r.change && r.used && r.used.label ? String(r.used.label) : "" };
     if (img && actions.some(a => a.type === "fill" && a.target === "listing")) msg.photo = img;
     push(msg);
     return msg;

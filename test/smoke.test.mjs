@@ -1057,7 +1057,7 @@ try {
         { type: "message", to: "Buyer", channel: "marketplace", text: "Thanks so much! It ships tomorrow." },
         { type: "reminder", at: "2020-01-01T09:00", text: "Ship the lamp" }] });
       if (t.includes("bubble wrap")) return json({ reply: "Got it.", actions: [{ type: "fill", target: "expense", data: { what: "Bubble wrap", amount: "12.49", where: "Walmart", date: "2026-11-10" } }] });
-      if (t.includes("dark mode")) return json({ reply: "I can’t change the app, but KJ’s helper can. Tap below to send it.", change: "Add a dark mode switch", actions: [] });
+      if (t.includes("dark mode")) return json({ reply: "Got it, I’ll pass that to the builder. You’d like a dark mode switch.", change: "Add a dark mode switch", actions: [], used: { cents: 0.02, msgs: 3, photos: 0, label: "FS-99" } });
       if (b.image) return json({ reply: "Cute mug! Here’s a listing.", actions: [{ type: "fill", target: "listing", summary: "Blue mug", data: { title: "Blue pottery mug", description: "Hand-thrown mug.", priceLow: "12", priceHigh: "18", condition: "Good" } }] });
       return json({ reply: "Hi!", actions: [] });
     });
@@ -1127,7 +1127,18 @@ try {
     await pk.fill("#kris-text", "Can you add a dark mode?");
     await pk.click("#kris-send");
     await pk.waitForSelector('[data-kris="change"]');
-    assert.match(await pk.getAttribute('[data-kris="change"]', "href"), /^mailto:kens\.remi@mail\.grokbot\.com/);
+    const chHref = await pk.getAttribute('[data-kris="change"]', "href");
+    assert.ok(chHref.startsWith("mailto:kens.remi@mail.grokbot.com?subject=Flip%20Side%20change%20request&body="));
+    const chBody = decodeURIComponent(chHref.split("&body=")[1]);
+    assert.match(chBody, /in my words:\nCan you add a dark mode\?/);
+    assert.match(chBody, /summary:\nAdd a dark mode switch/);
+    assert.match(chBody, /App version: \d+\.\d+\.\d+/);
+    assert.match(chBody, /Device: iPhone · iOS 18\.0 · Safari/);
+    assert.match(chBody, /Kris code: FS-99/);
+    assert.match(await pk.textContent('.kris-card[data-type="change"]'), /You press Send/);
+    assert.match(await pk.textContent("#kris-msgs"), /pass that to the builder/);
+    await pk.locator('.kris-card[data-type="change"]').scrollIntoViewIfNeeded();
+    { const f = `${OUT}${String(++n).padStart(2, "0")}-v101-change.png`; await pk.screenshot({ path: f }); copyFileSync(f, join(SHOTS, "v101-change.png")); console.log("  shot v101-change.png"); }
 
     // photo -> listing draft with the photo
     await pk.setInputFiles("#kris-photo-file", mugPath);
