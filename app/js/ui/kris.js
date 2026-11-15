@@ -128,6 +128,7 @@ export async function openKris() {
     if (!log.length) msgs.append(h("div", { class: "kris-msg kris-ai", id: "kris-hello" }, h("div", { class: "kris-txt" },
       `Hi${nm ? " " + nm : ""}! I’m Kris, your reselling helper. Snap a photo and I’ll write the listing. I can help price things, answer a buyer, keep your records straight, log an expense, or remind you of something. What are we working on?`)));
     msgs.append(h("div", { class: "kris-quick", id: "kris-quick" },
+      h("button", { type: "button", class: "btn sm kris-q", id: "kris-talk-start", onclick: () => startTalk() }, "🎙 Talk hands-free"),
       quick("📷 List it from a photo", "listing", "Make a listing from this photo.", true),
       quick("💲 What’s it worth?", "chat", "What could I sell this for? "),
       quick("💬 Answer a buyer", "chat", "Help me answer a buyer. They said: "),
@@ -155,6 +156,7 @@ export async function openKris() {
 }
 export function closeKris() {
   if (rec) try { rec.stop(); } catch (e) { }
+  stopTalk();
   if (panel) panel.remove();
   panel = null;
   document.body.classList.remove("kris-open");
@@ -382,25 +384,27 @@ function openItemFromHash() {
   const m = /^#\/item\/([^/]+)/.exec(location.hash || "");
   return m ? (C.items || []).find(i => i.id === m[1]) || null : null;
 }
-async function sendChat(ta) {
-  if (busy) return;
-  const text = ta.value.trim(), img = pending;
-  if (!text && !img) { toast("Type something or add a photo"); return; }
-  const mode = pickMode(ta.dataset.mode, !!img);
+async function sendChat(ta, { spoken = "" } = {}) {
+  if (busy) return null;
+  const text = spoken || ta.value.trim(), img = spoken ? null : pending;
+  if (!text && !img) { toast("Type something or add a photo"); return null; }
+  const mode = spoken ? "chat" : pickMode(ta.dataset.mode, !!img);
   const prior = log.slice();
   busy = true;
-  push({ who: "me", text, img: img || undefined });
-  ta.value = ""; delete ta.dataset.mode; pending = null;
+  push({ who: "me", text: (spoken ? "🎙 " : "") + text, img: img || undefined });
+  if (!spoken) { ta.value = ""; delete ta.dataset.mode; pending = null; }
   const t = document.getElementById("kris-thumb"); if (t) t.hidden = true;
   const hello = document.getElementById("kris-hello"); if (hello) hello.remove();
   const wait = h("div", { class: "kris-msg kris-ai kris-wait", id: "kris-wait" }, "Kris is thinking…");
   const box = document.getElementById("kris-msgs"); if (box) { box.append(wait); box.scrollTop = box.scrollHeight; }
   try {
     const expenses = await krisStore.get("krisExpenses", []);
-    const context = krisContext({ items: C.items || [], screen: C.screen, openItem: openItemFromHash(), name: firstName(), expenses });
+    let context = krisContext({ items: C.items || [], screen: C.screen, openItem: openItemFromHash(), name: firstName(), expenses });
+    try { context = (context + "\n" + (await bizContext())).slice(0, 3000); } catch (e) { }
+    if (spoken) context = (context + "\nShe is talking out loud (hands-free): reply in 1-3 short spoken sentences, no lists, no symbols.").slice(0, 3000);
     const r = await core().ask({ text, image: img || null, mode, log: prior, context, app: { id: KRIS_APP_ID, version: C.version || "", view: C.screen || "" } });
     wait.remove();
-    if (!r.ok) { if (r.error === "code") forgetCodeHere(); push({ who: "note", text: friendlyError(r.error) }); return; }
+    if (!r.ok) { if (r.error === "code") forgetCodeHere(); push({ who: "note", text: friendlyError(r.error) }); return { error: friendlyError(r.error) }; }
     let remembered = [];
     for (const a of r.actions.filter(a => a.type === "remember")) remembered = remembered.concat(await core().addFacts(a.facts || []));
     for (const a of r.actions.filter(a => a.type === "forget")) { const n = await core().forget(a.match); if (n) toast("Forgot " + n + " thing" + (n > 1 ? "s" : "") + "."); }
@@ -409,9 +413,93 @@ async function sendChat(ta) {
     const msg = { who: "ai", text: r.reply || "", mode, actions, remembered, change: r.change ? [r.change, text].filter(Boolean).join("\n\nIn my words: ") : "" };
     if (img && actions.some(a => a.type === "fill" && a.target === "listing")) msg.photo = img;
     push(msg);
-  } catch (e) { wait.remove(); push({ who: "note", text: friendlyError("network") }); }
+    return msg;
+  } catch (e) { wait.remove(); push({ who: "note", text: friendlyError("network") }); return { error: friendlyError("network") }; }
   finally { busy = false; }
 }
 
+// ---------- business context for Kris (decisions she made, the open item's strategy and listings) ----------
+async function bizContext() {
+  const [{ bizStore }, B2] = await Promise.all([import("../core/bizstore.js"), import("../core/business.js")]);
+  const st = bizStore(), out = [];
+  const dt = B2.decisionsText(await st.decisions());
+  if (dt) out.push("Her past decisions (notice if she changes her mind and ask if it's the new usual):\n" + dt);
+  const it = openItemFromHash() || (/^#\/(strategy|listing)\/([^/]+)/.exec(location.hash || "") ? (C.items || []).find(i => i.id === /^#\/(strategy|listing)\/([^/]+)/.exec(location.hash)[2]) : null);
+  if (it) {
+    const b = B2.withBiz(it), bits = [];
+    if (b.sku) bits.push("SKU " + b.sku);
+    if (b.strategy.mode) bits.push("strategy " + B2.STRATEGIES[b.strategy.mode].label + (b.strategy.target != null ? ", target $" + b.strategy.target : "") + (b.strategy.minOffer != null ? ", lowest OK offer $" + b.strategy.minOffer : ""));
+    if (b.offers.length) bits.push("offers " + b.offers.map(o => "$" + o.amount + " " + o.decision).join(", "));
+    if (b.garment) bits.push("facts: " + Object.entries(b.garment).filter(([k, v]) => v && k !== "noFlaws").map(([k, v]) => k + " " + String(v).slice(0, 60)).join("; "));
+    if (bits.length) out.push("Open item details: " + bits.join(" | "));
+  }
+  return out.join("\n");
+}
+
+// ---------- hands-free talk: speech in, spoken reply out (the browser's own speech; nothing extra to install) ----------
+let talk = null;
+export async function openKrisTalk() {
+  const p = await openKris();
+  if (!getCode()) return p;
+  startTalk();
+  return p;
+}
+function speak(text, done) {
+  try {
+    const synth = globalThis.speechSynthesis;
+    if (!synth || !text) { done(); return; }
+    synth.cancel();
+    const u = new SpeechSynthesisUtterance(String(text).replace(/[*_#`>]/g, "").slice(0, 900));
+    u.lang = navigator.language || "en-US"; u.rate = 1.0;
+    u.onend = () => done(); u.onerror = () => done();
+    synth.speak(u);
+  } catch (e) { done(); }
+}
+export function startTalk() {
+  const SR = globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition;
+  if (!SR) { toast("Hands-free talk needs Safari or Chrome with the microphone allowed. You can tap 🎤 on the keyboard instead."); return false; }
+  stopTalk();
+  const bar = h("div", { class: "kris-talk", id: "kris-talk", role: "status", "aria-live": "polite" },
+    h("div", { class: "kris-talk-dot" }), h("div", { class: "kris-talk-txt", id: "kris-talk-txt" }, "I’m listening…"),
+    h("button", { type: "button", class: "btn sm", id: "kris-talk-stop", onclick: () => stopTalk(true) }, "■ Stop"));
+  const host = document.getElementById("kris-panel"); if (host) host.append(bar);
+  talk = { on: true, rec: null, bar };
+  const say = t => { const el = document.getElementById("kris-talk-txt"); if (el) el.textContent = t; };
+  const listen = () => {
+    if (!talk || !talk.on) return;
+    let heard = "";
+    try {
+      const rec = new SR(); talk.rec = rec;
+      rec.lang = navigator.language || "en-US"; rec.interimResults = true; rec.continuous = false;
+      rec.onresult = ev => { heard = [...ev.results].map(r => r[0].transcript).join(" ").trim(); say("“" + heard + "”"); };
+      rec.onerror = ev => { if (talk && talk.on && ev && (ev.error === "not-allowed" || ev.error === "service-not-allowed")) { toast("Please allow the microphone to talk with Kris."); stopTalk(); } };
+      rec.onend = async () => {
+        if (!talk || !talk.on) return;
+        if (!heard) { setTimeout(listen, 250); return; }
+        if (/^(stop|bye|goodbye|that's all|thats all|i'm done|im done)\.?$/i.test(heard)) { speak("Okay, talk soon.", () => { }); stopTalk(); return; }
+        say("Kris is thinking…");
+        const ta = document.getElementById("kris-text") || { value: "", dataset: {} };
+        const msg = await sendChat(ta, { spoken: heard });
+        if (!talk || !talk.on) return;
+        const reply = msg && (msg.text || msg.error) || "Sorry, I missed that.";
+        say("Kris: " + reply.slice(0, 140) + (reply.length > 140 ? "…" : ""));
+        speak(reply + (msg && msg.actions && msg.actions.length ? " I put a card in the chat for you to tap." : ""), () => setTimeout(listen, 200));
+      };
+      rec.start(); say("I’m listening…");
+    } catch (e) { setTimeout(listen, 600); }
+  };
+  speak("Hi! I'm listening.", listen);
+  return true;
+}
+export function stopTalk(byUser = false) {
+  if (!talk) return;
+  talk.on = false;
+  try { talk.rec && talk.rec.abort(); } catch (e) { }
+  try { globalThis.speechSynthesis && globalThis.speechSynthesis.cancel(); } catch (e) { }
+  if (talk.bar) talk.bar.remove();
+  talk = null;
+  if (byUser) toast("Stopped listening.");
+}
+
 // For tests only.
-export const __kris = { log, checkReminders, core: () => core(), bootKrisAccess, swapManifest };
+export const __kris = { log, checkReminders, core: () => core(), bootKrisAccess, swapManifest, startTalk, stopTalk, sendSpoken: text => sendChat({ value: "", dataset: {} }, { spoken: text }) };

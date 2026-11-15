@@ -12,6 +12,9 @@ import { renderScan } from "./ui/screens/scan.js";
 import { renderSecondLook, mountSecondLookBanner } from "./ui/screens/secondlook.js";
 import { renderTaxes } from "./ui/screens/taxes.js";
 import { renderCompat } from "./ui/screens/compat.js";
+import { renderListing } from "./ui/screens/listing.js";
+import { renderBiz, renderStrategy } from "./ui/screens/biz.js";
+import { renderListStyle } from "./ui/screens/liststyle.js";
 import { getJob as getSecondLookJob, loadScans, startSecondLook, saveScan, clearSecondLook, getScan, removeScan } from "./core/secondlook.js";
 import { badgeCount, attentionItems, shouldRemind, reminderBody, delistCountdown } from "./core/protect.js";
 import { getSettings, setReminder, getReminders } from "./core/settings.js";
@@ -23,9 +26,9 @@ import { openIntro, closeIntro, isIntroOpen, getDemoSession } from "./ui/intro.j
 import { shouldShowTermsGate, rememberInviteIfValid } from "./core/invite.js";
 import { openTerms, closeTerms, isTermsOpen } from "./ui/terms.js";
 import { takeSetupLink, krisKvSnapshot, applyKrisKv, onKrisChange, isStandaloneDisplay } from "./core/kris.js";
-import { mountKris, openKris, closeKris, bootKrisAccess } from "./ui/kris.js";
+import { mountKris, openKris, closeKris, bootKrisAccess, openKrisTalk } from "./ui/kris.js";
 
-export const VERSION = "0.9.1";
+export const VERSION = "0.10.0";
 
 const view = $("#view");
 const store = await createStore();
@@ -91,14 +94,18 @@ const SCREEN_NAMES = {
   taxes: "Taxes",
   sites: "Site limits",
   welcome: "Welcome",
-  demo: "Demo"
+  demo: "Demo",
+  listing: "New listing",
+  biz: "Business manager",
+  strategy: "Pricing & offers",
+  liststyle: "Listing style"
 };
 
 function render() {
   const { head, rest } = parseHash();
   const tab = head === "item" ? "items"
     : (head === "taxes" ? "home"
-    : (head === "sites" ? "settings" : (head === "secondlook" ? "home" : (head || "home"))));
+    : (head === "sites" || head === "liststyle" ? "settings" : (["secondlook", "listing", "biz"].includes(head) ? "home" : head === "strategy" ? "items" : (head || "home"))));
   document.querySelectorAll(".tabs a").forEach(a => a.classList.toggle("on", a.dataset.tab === tab));
   ctx.screen = SCREEN_NAMES[head] || head;
   if (head === "item" && rest[0]) {
@@ -128,6 +135,14 @@ function render() {
     renderTaxes(ctx, view, rest[0]);
   } else if (head === "sites") {
     renderCompat(ctx, view);
+  } else if (head === "listing") {
+    renderListing(ctx, view, rest);
+  } else if (head === "biz") {
+    renderBiz(ctx, view, rest[0] || "", rest);
+  } else if (head === "strategy" && rest[0]) {
+    renderStrategy(ctx, view, rest[0], rest[1] || "");
+  } else if (head === "liststyle") {
+    renderListStyle(ctx, view);
   } else if (head === "welcome" || head === "demo") {
     ctx.screen = SCREEN_NAMES[head];
     renderHome(ctx, view);
@@ -337,5 +352,6 @@ window.__flip = {
   closeTerms,
   isTermsOpen,
   openKris,
-  closeKris
+  closeKris,
+  openKrisTalk
 };

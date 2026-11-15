@@ -36,6 +36,12 @@ export function renderSettings(ctx, el) {
   el.innerHTML = `
     <div class="topbar"><a class="iconbtn" href="#/home" aria-label="Back">‹</a><h2>Settings</h2><span class="spacer48"></span></div>
 
+    <div class="card" id="liststylecard">
+      <h3>Listing style &amp; SKUs</h3>
+      <p class="small muted">Your Depop format, SKU numbers for each category, clothing or general items, and what Kris learned about your writing.</p>
+      <a class="btn" href="#/liststyle" id="open-liststyle">✍️ Open listing style &amp; SKUs</a>
+    </div>
+
     <div class="card" id="keycard">
       <h3>AI key</h3>
       <p class="small">Paste the key Ken sent you. It stays on this phone only. It is never put in a backup, and it is only sent to the AI service when you make a draft from a photo, ask a question, or tap Check key.</p>
