@@ -405,9 +405,37 @@ export function smsHref(to, body) {
   if (num.replace(/\D/g, "").length < 7) return "";
   return "sms:" + num + "?&body=" + encodeURIComponent(body || "");
 }
-export function changeMailto({ text = "", version = "" } = {}) {
-  const body = ["APP REQUEST (from Ask Kris in Flip Side)", "", String(text || "").trim(), "", "---", "App version: " + version].join("\n");
-  return "mailto:" + CHANGE_TO + "?subject=" + encodeURIComponent("Flip Side app request (from Kris)") + "&body=" + encodeURIComponent(body);
+export const CHANGE_SUBJECT = "Flip Side change request";
+/** "iPhone · iOS 18.0 · Safari" from the browser's user agent (no IDs, just the kind of device). */
+export function deviceName(ua = (globalThis.navigator && navigator.userAgent) || "") {
+  const u = String(ua);
+  let dev = "", os = "";
+  let m;
+  if ((m = u.match(/iPhone OS (\d+[_.]\d+)/))) { dev = "iPhone"; os = "iOS " + m[1].replace("_", "."); }
+  else if ((m = u.match(/iPad.*OS (\d+[_.]\d+)/))) { dev = "iPad"; os = "iPadOS " + m[1].replace("_", "."); }
+  else if ((m = u.match(/Android (\d+(?:\.\d+)?)/))) { dev = "Android phone"; os = "Android " + m[1]; }
+  else if (/Macintosh/.test(u)) { dev = "Mac"; os = "macOS"; }
+  else if (/Windows/.test(u)) { dev = "Windows PC"; os = "Windows"; }
+  else if (/CrOS/.test(u)) { dev = "Chromebook"; os = "ChromeOS"; }
+  else if (/Linux/.test(u)) { dev = "Linux computer"; os = "Linux"; }
+  const br = /EdgA?\//.test(u) ? "Edge" : /SamsungBrowser/.test(u) ? "Samsung Internet" : /CriOS|Chrome\//.test(u) ? "Chrome" : /FxiOS|Firefox\//.test(u) ? "Firefox" : /Safari\//.test(u) ? "Safari" : "";
+  const standalone = globalThis.matchMedia && globalThis.matchMedia("(display-mode: standalone)").matches;
+  return [dev || "Unknown device", os, br, standalone ? "Home Screen app" : ""].filter(Boolean).join(" · ");
+}
+const stripAsk = t => String(t || "").replace(/^\s*please change my app:\s*/i, "").trim();
+/** Her app change request as a mail draft to the builder. She presses Send herself; nothing is sent from here. */
+export function changeMailto({ request = "", summary = "", text = "", version = "", device = "", label = "" } = {}) {
+  const sum = String(summary || text || "").trim(), mine = stripAsk(request);
+  const body = [
+    "Flip Side change request (from Ask Kris)", "",
+    "What I asked for, in my words:", mine || "(see the summary)", "",
+    "Kris's one-line summary:", sum || "(none)", "",
+    "---",
+    "App version: " + (version || "unknown"),
+    "Device: " + (device || deviceName()),
+    "Kris code: " + (label || "unknown")
+  ].join("\n");
+  return "mailto:" + CHANGE_TO + "?subject=" + encodeURIComponent(CHANGE_SUBJECT) + "&body=" + encodeURIComponent(body);
 }
 export function friendlyError(error) {
   return ({
