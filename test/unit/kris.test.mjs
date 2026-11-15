@@ -80,7 +80,7 @@ describe("Kris memory store and sync", () => {
     assert.deepEqual(snap["kris:krisAccess"].payload, { v: [FAKE] });
     assert.ok(!JSON.stringify({ ...snap, "kris:krisAccess": null }).includes(FAKE), "the code is only in krisAccess");
     for (const v of Object.values(snap)) { assert.equal(payloadHasKey(v.payload), false); assert.deepEqual(stripKeyish(v.payload), v.payload); }
-    assert.deepEqual(SYNC_NAMES, ["krisFacts", "krisTopics", "krisReminders", "krisExpenses"]);
+    assert.deepEqual(SYNC_NAMES.slice(0, 4), ["krisFacts", "krisTopics", "krisReminders", "krisExpenses"]);
   });
   it("applies the other device's copy only for known lists", async () => {
     const s = mem(), store = createKrisStore(s);

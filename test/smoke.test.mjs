@@ -1225,6 +1225,142 @@ try {
     assert.equal(krisHits.filter(x => x !== "REAL").length, 2);
   });
 
+  await step("v0.10.0 listing engine + business manager: dashboard, photos to Depop, other sites, strategy, offer, report, calendar, style", async () => {
+    const kBase = `http://127.0.0.1:${srv.address().port}/index.html?nosw&nointro&nowalk&noterms`;
+    const ctx10 = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
+      userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1" });
+    await ctx10.grantPermissions(["clipboard-read", "clipboard-write"]);
+    const p = await ctx10.newPage();
+    p.setDefaultTimeout(10000);
+    p.on("pageerror", e => { errors.push("pageerror v10: " + e.message); console.log("  v10 page error:", e.message); });
+    const hits = [];
+    await p.route("https://kris-chat.kens-remi.workers.dev/**", r => { hits.push("REAL"); return r.abort(); });
+    await p.route("https://fake-kris.test/**", r => {
+      const b = JSON.parse(r.request().postData() || "{}");
+      hits.push({ mode: b.mode, images: (b.image ? 1 : 0) + (b.images || []).length, text: b.text });
+      const data = b.mode === "garment" ? { category: "wout", brand: "Gap", size: "Small", color: "Light wash blue", material: "Denim", condition: "used good", measurements: "Pit to pit 19 in\nLength 21 in", flaws: "Light fading on the left cuff", details: "Classic trucker jacket, button front, flap chest pockets", era: "", check: ["Check the size tag"] }
+        : b.mode === "depop" ? { keywords: ["Gap denim jacket", "light wash trucker jacket", "womens jean jacket", "SKU"], body: "Title: Gap jacket\nThis gorgeous Gap trucker jacket comes in a light wash with a button front and flap chest pockets. Size Small. Good used condition with light fading on the left cuff.\nPit to pit 19 in\nLength 21 in\nSKU: WOUT001", hashtags: ["#gap", "denimjacket", "#truckerjacket", "#gap"], styles: ["Casual", "Retro", "Made up"], occasions: ["Casual", "school"], check: [] }
+        : b.mode === "xlist" ? { mercari: { title: "Gap Light Wash Denim Trucker Jacket Womens Small Button Front Flap Pockets Classic Jean", description: "Gap trucker jacket, light wash, size Small. Light fading on the left cuff.\nPit to pit 19 in, length 21 in." }, vinted: { title: "Gap light wash denim jacket, Small", description: "Light wash Gap jacket. Light fading on the left cuff." }, ebay: { title: "Gap Womens Denim Trucker Jacket Small Light Wash Blue Button Front", description: "Gap women's denim trucker jacket, size Small.\nCondition: good used, light fading on the left cuff.\nPit to pit 19 in, length 21 in." } }
+        : null;
+      return r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(data ? { reply: "", mode: b.mode, data, actions: [], tokens: { in: 900, out: 250, cents: 0.03 } } : { reply: "Hi!", actions: [] }) });
+    });
+    await p.addInitScript(() => { window.__KRIS_URL = "https://fake-kris.test"; window.__flipQuiet = true; window.__flipFast = true; try { localStorage.setItem("flip-helper.introDone", "1"); localStorage.setItem("flip-helper.walkthroughDone", "1"); localStorage.setItem("flip-helper.kris.code", "FS-TESTFAKE00001"); } catch (e) {} });
+    const v10shot = async name => { await p.waitForTimeout(250); await p.evaluate(() => { const t = document.querySelector("#toast"); if (t) { t.classList.remove("show"); t.textContent = ""; } }); await p.waitForTimeout(300); const f = `${OUT}${String(++n).padStart(2, "0")}-${name}`; await p.screenshot({ path: f }); copyFileSync(f, join(SHOTS, name)); console.log("  shot", name); };
+    const hgo = async h => { await p.evaluate(x => { location.hash = x; }, h); await p.waitForTimeout(350); };
+    await p.goto(kBase); await p.waitForSelector("html[data-ready='1']");
+
+    // dashboard: 6 big buttons, old tools still there
+    await p.waitForSelector("#dash");
+    for (const c of ["listing", "find", "attention", "offer", "report", "talk"]) assert.ok(await p.$(`#dash [data-cta="${c}"]`), "dashboard tile " + c);
+    assert.ok(await p.isVisible('[data-cta="add"]'));
+    await v10shot("v10-dashboard.png");
+
+    // a sourcing batch
+    await hgo("#/biz/batches");
+    await p.fill("#bt-name", "Saturday bins"); await p.fill("#bt-cost", "18"); await p.fill("#bt-where", "Goodwill outlet");
+    await p.click("#bt-add");
+    await p.waitForFunction(() => /^#\/biz\/batch\//.test(location.hash));
+    await p.waitForSelector("#bt-newlisting");
+
+    // listing: photo + what she said -> fill in
+    await hgo("#/home"); await p.click('#dash [data-cta="listing"]');
+    await p.waitForSelector("#lst-read");
+    await p.setInputFiles("#lst-lib", join(HERE, "fixtures/jacket.jpg"));
+    await p.waitForSelector(".photos .photo img");
+    await p.fill("#lst-said", "Gap jean jacket, small, pit to pit 19, length 21, light fading on the left cuff");
+    await p.fill("#f-brand", "Gap");
+    await p.click("#lst-read");
+    await p.waitForFunction(() => document.querySelector("#f-size") && document.querySelector("#f-size").value === "Small");
+    assert.equal(await p.inputValue("#f-condition"), "Used - Good");
+    assert.equal(await p.inputValue("#f-category"), "wout");
+    assert.match(await p.inputValue("#f-flaws"), /fading/);
+    await p.fill("#f-price", "32"); await p.fill("#f-cost", "6");
+    const bid = await p.evaluate(() => [...document.querySelectorAll("#lst-batch option")].find(o => /Saturday bins/.test(o.textContent)).value);
+    await p.selectOption("#lst-batch", bid);
+    await p.waitForTimeout(700);
+    await v10shot("v10-listing-facts.png");
+    await p.click("#lst-next1");
+    await p.waitForSelector("#lst-write");
+    assert.equal(await p.textContent("#lst-sku-peek"), "WOUT001");
+    await p.click("#lst-write");
+    await p.waitForSelector("#lst-depop-text");
+    const dep = await p.inputValue("#lst-depop-text");
+    const lines = dep.split("\n");
+    assert.ok(!/^title/i.test(lines[0]) && /^Gap denim jacket \| /.test(lines[0]), "no title; keywords first: " + lines[0]);
+    assert.equal((dep.match(/#\w+/g) || []).length, 5, "exactly 5 hashtags");
+    assert.equal(lines[lines.length - 1], "WOUT001", "SKU alone on the last line");
+    assert.ok(!/\bsku\b/i.test(dep), "no SKU word");
+    assert.equal(await p.locator("#lst-checks li.bad").count(), 0, "all checks pass");
+    assert.equal(await p.locator("#lst-styles .chip-tag.on").count(), 3);
+    assert.equal(await p.locator("#lst-occasions .chip-tag.on").count(), 3);
+    // she edits out "gorgeous", adds a rule, copies, approves
+    await p.fill("#lst-depop-text", dep.replace("This gorgeous Gap", "This Gap"));
+    await p.waitForTimeout(400);
+    await p.fill("#lst-rule", "never say gorgeous"); await p.click("#lst-rule-add");
+    await p.click("#lst-copy-depop");
+    assert.match(await p.evaluate(() => navigator.clipboard.readText()), /WOUT001$/);
+    await v10shot("v10-depop.png");
+    await p.click("#lst-approve");
+    await p.waitForSelector("#lst-make");
+    await p.click("#lst-make");
+    await p.waitForSelector("#lst-tabs");
+    for (const [site, max] of [["mercari", 80], ["vinted", 100], ["ebay", 80]]) {
+      await p.click(`#lst-tabs [data-tab="${site}"]`); await p.waitForSelector(`#lst-site[data-site="${site}"]`);
+      const t = await p.inputValue("#x-title"), d = await p.inputValue("#x-desc");
+      assert.ok(t.length > 0 && t.length <= max, site + " title " + t.length);
+      assert.equal(d.split("\n").pop(), "WOUT001", site + " SKU last");
+      assert.match(d, /fading/, site + " keeps the flaw");
+    }
+    assert.equal(await p.inputValue("#x-sku"), "WOUT001");
+    await p.click('[data-copyfield="x-title"]');
+    assert.equal(await p.evaluate(() => navigator.clipboard.readText()), await p.inputValue("#x-title"));
+    await v10shot("v10-ebay.png");
+    await p.click("#lst-done");
+    await p.waitForFunction(() => /^#\/item\//.test(location.hash));
+    const id = await p.evaluate(() => location.hash.split("/")[2]);
+    assert.ok(await p.$("#item-strategy"), "item has a pricing & offers button");
+    assert.match(await p.textContent("#view"), /WOUT001/);
+
+    // strategist: pick Maximize profit, apply; then review a lowball offer
+    await hgo("#/strategy/" + id);
+    await p.waitForSelector("#st-card");
+    await p.click('[data-mode="max"]'); await p.click("#st-apply");
+    await p.waitForTimeout(400);
+    assert.ok(Number(await p.inputValue("#st-target")) > 32, "max profit raises the target");
+    await p.fill("#of-amt", "15"); await p.click("#of-check");
+    await p.waitForSelector("#of-verdict");
+    assert.equal(await p.getAttribute("#of-verdict", "data-verdict"), "counter");
+    await p.click('[data-dec="declined"]');
+    await p.waitForTimeout(400);
+    await v10shot("v10-strategy.png");
+    await hgo("#/strategy/" + id);
+    await p.waitForSelector("#st-history");
+    const hist = await p.textContent("#st-history");
+    for (const w of ["Saturday bins", "Offer", "Strategy"]) assert.ok(hist.includes(w), "history has " + w + ": " + hist);
+
+    // reports, fee calculator, calendar, style settings
+    await hgo("#/biz/report"); await p.waitForSelector("#fin-totals");
+    await p.fill("#fc-price", "30"); await p.fill("#fc-cost", "5");
+    await p.waitForFunction(() => document.querySelectorAll("#fc-out tr[data-site]").length === 4);
+    await v10shot("v10-report.png");
+    await hgo("#/biz/calendar"); await p.waitForSelector("#cal-grid");
+    assert.ok(await p.locator("#cal-grid .cal-d.has").count() >= 1, "the review date is on the calendar");
+    await v10shot("v10-calendar.png");
+    await hgo("#/liststyle"); await p.waitForSelector("#ls-rules");
+    assert.match(await p.textContent("#ls-rules"), /gorgeous/);
+    assert.match(await p.textContent("#ls-skutable"), /WOUT/);
+    await v10shot("v10-liststyle.png");
+    await hgo("#/biz/find"); await p.fill("#biz-q", "WOUT001"); await p.waitForTimeout(300);
+    assert.match(await p.textContent("#biz-results"), /Gap/);
+
+    assert.ok(!hits.includes("REAL"), "never the real Kris");
+    assert.deepEqual(hits.map(h => h.mode), ["garment", "depop", "xlist"]);
+    assert.equal(hits[0].images, 1);
+    assert.match(hits[1].text, /never say gorgeous|Whimsygoth/i);
+    assert.match(hits[2].text, /never say gorgeous/i, "her rule reaches the next AI call");
+    await ctx10.close();
+  });
+
   await step("v0.7.0 studio photo: real U²-Netp model, sheet UI, and a 12MP timing run", async () => {
     const p7 = await context.newPage();
     p7.setDefaultTimeout(120000);

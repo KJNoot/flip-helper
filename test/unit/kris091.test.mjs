@@ -137,9 +137,9 @@ describe("v0.9.1 notifications and wiring", () => {
     assert.match(ui, /isIOSDevice\(\{[^}]*\}\) && !isStandaloneDisplay\(win\)\) swapManifest/);
     assert.match(ui, /return !!getCode\(\) \|\| invited \|\| flag;/);
   });
-  it("bumps to 0.9.1", () => {
-    assert.equal(JSON.parse(read("package.json")).version, "0.9.1");
-    assert.match(read("app/js/main.js"), /export const VERSION = "0\.9\.1"/);
-    assert.match(read("app/sw.js"), /flip-helper-v0\.9\.1/);
+  it("bumps to 0.10.0", () => {
+    assert.equal(JSON.parse(read("package.json")).version, "0.10.0");
+    assert.match(read("app/js/main.js"), /export const VERSION = "0\.10\.0"/);
+    assert.match(read("app/sw.js"), /flip-helper-v0\.10\.0/);
   });
 });

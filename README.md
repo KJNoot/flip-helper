@@ -12,7 +12,22 @@ On an iPhone: open that address in Safari, tap the Share button, then **Add to H
 
 One complete app from day one. There is no subscription in this test version, and no essential tool is locked behind an upgrade. The app is built so someone who is not used to computers can use it: big, clear buttons, one main action per screen, plain words, a first-open welcome and try-it demo, a short skippable walkthrough, a "?" on tricky controls, and advanced options behind "More" rather than removed.
 
-## What this version (0.9.1) does
+## What this version (0.10.0) does
+
+- **New in 0.10.0, Jessika's full vision (listing engine + business manager + strategist + hands-free Kris):**
+  - **Dashboard** on Home: six big tiles: Start a listing, Find inventory, Needs attention, Review an offer, Financial snapshot, Talk to Kris. The older tools (Add an item, Buy or pass, Second look, Business manager) sit under "More tools".
+  - **Start a listing (clothing first):** photos, then the garment facts (category, brand, size, color, material, condition, measurements, flaws, details, era, price, cost, batch). She can talk instead of type (mic on each box, plus a "Tell me about it" box). "Fill in from my photos" sends up to 4 photos and what she said to Kris (Kris server `garment` mode) and fills only empty boxes. Everything is saved on the item as she types (`item.garment`), so nothing is asked twice.
+  - **Depop in her format** (Kris `depop` mode, then checked in the app): no title, 3 to 5 search keywords on the first line, a natural description with details, condition, flaws and measurements, exactly 5 hashtags, her SKU alone on the last line with no "SKU" word, and 3 style + 3 occasion tags picked only from Depop's real lists (hard-coded from Depop's public taxonomy, read 2026-11-15; the AI's picks are matched and anything else is dropped). Live checks, "Fix the format for me", tag chips, copy buttons, Approve.
+  - **One tap for Mercari, Vinted and eBay** (Kris `xlist` mode): a tab each with its own title (80 / 100 / 80 characters), description (1,000 / 2,000 / long), price and per-field copy buttons; eBay also gets the SKU as Custom label and item specifics. Same facts everywhere (checked).
+  - **Automatic SKUs** by category (WTOP, WBTM, WDRS, … with the next number, digits and separator editable in Settings → Listing style & SKUs, so she can continue her spreadsheet). Numbers already on an item are skipped.
+  - **Writing-style memory:** her edits to Kris's drafts are diffed and kept as examples; a word she deletes twice becomes an "avoid" rule; rules she types ("never say gorgeous") or tells Kris in chat ("Listing style: …") are used on every new listing. She can see and delete them.
+  - **Business manager:** sourcing batches (hauls) linked to items, with cost split and performance; Find inventory by SKU/brand/size; Needs attention; each item's history (where it came from, cost, listings, offers, promos, price changes, relists, outcome).
+  - **Strategist:** per-item strategy (Maximize profit / Balanced / Faster sales) with a target price, lowest OK offer and per-platform prices that keep about the same take-home after each site's fees; fee and profit calculator for Depop, Mercari, Vinted and eBay; offer review (accept / counter / pass, with the math) that is logged; promos, price changes and relists tracked; a relisting calendar with an .ics file of review alarms and an in-app reminder. Decisions are remembered and Kris points out when she goes against her usual choice ("make it my new usual?").
+  - **Financial snapshot:** combined totals, by-platform comparison and sourcing-batch performance (this month / this year / all time).
+  - **Talk to Kris hands-free:** speech in (browser speech recognition), spoken reply out (speech synthesis), in a loop until she says stop or taps Stop. Any card Kris makes stays in the chat to tap.
+  - **Clothing vs. general merchandise** is an optional setting.
+  - Existing items are untouched: the new fields are added with safe defaults, older items get a derived history, and "Make listings for this item" starts from what's already on them.
+
 
 - **New in 0.9.0, Ask Kris:** see [Ask Kris](#ask-kris) below. **0.9.1:** her code now reaches every copy of the app by itself (see "How her code gets everywhere").
 
