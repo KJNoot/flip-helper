@@ -18,7 +18,9 @@ export const LOG_KEY = "flip-helper.kris.log"; // the chat on this device (photo
 export const KV_PREFIX = "flip-helper.kris.kv.";
 // What Kris remembers, recent chat topics, reminders and expenses. These ride along with
 // "Sync with my computer" when it is on (the kv table). The code and the chat log do not.
-export const SYNC_NAMES = ["krisFacts", "krisTopics", "krisReminders", "krisExpenses"];
+export const SYNC_NAMES = ["krisFacts", "krisTopics", "krisReminders", "krisExpenses",
+  // v0.10: her listing format, SKU counters, writing-style memory, sourcing batches and decisions (see bizstore.js)
+  "listPrefs", "listSku", "listStyle", "bizBatches", "bizDecisions"];
 // v0.9.1: her code also rides along in her own sync data, so a paired device turns Kris on by itself.
 export const ACCESS_NAME = "krisAccess";
 export const CODE_AT_KEY = "flip-helper.kris.codeAt";
