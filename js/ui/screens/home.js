@@ -6,6 +6,7 @@ import { getSettings, PAUSE_NOTE_ON } from "../../core/settings.js";
 import { yearTotals } from "../../core/taxes.js";
 import { getTrips } from "../../core/settings.js";
 import { morningList } from "../../core/morning.js";
+import { needsAttention, finance, monthRange, withBiz } from "../../core/business.js";
 
 export function renderHome(ctx, el) {
   const items = ctx.items;
@@ -19,17 +20,30 @@ export function renderHome(ctx, el) {
   const year = new Date().getFullYear();
   const ytot = yearTotals(items, getTrips(), year);
   const paused = settings.pauseAutomation;
+  const attn = needsAttention(items.map(withBiz)).length;
+  const snap = finance(items, monthRange());
   el.innerHTML = `
     <div class="hero">
       <p class="hero-brand"><span class="wordmark-script">Jessika’s</span><span class="wordmark-bold">Flip Side</span></p>
       <h1>Take a photo. Get a draft. Keep track.</h1>
       <p class="muted">A pocket helper for listing the same item on more than one site.</p>
+    </div>
+    <div class="dash" id="dash">
+      <a class="dash-tile main" href="#/listing" data-cta="listing"><span class="dt-ic">👗</span><b>Start a listing</b><span class="tiny muted">Photos → Depop → all sites</span></a>
+      <a class="dash-tile" href="#/biz/find" data-cta="find"><span class="dt-ic">🔍</span><b>Find inventory</b><span class="tiny muted">SKU, brand, size</span></a>
+      <a class="dash-tile" href="#/biz/attention" data-cta="attention"><span class="dt-ic">⚠️</span><b>Needs attention</b><span class="tiny muted" id="dash-attn">${attn ? attn + " to look at" : "All caught up"}</span></a>
+      <a class="dash-tile" href="#/biz/offer" data-cta="offer"><span class="dt-ic">🤝</span><b>Review an offer</b><span class="tiny muted">Accept, counter, pass</span></a>
+      <a class="dash-tile" href="#/biz/report" data-cta="report"><span class="dt-ic">📊</span><b>Financial snapshot</b><span class="tiny muted">${esc(formatUsd(snap.profit))} profit this month</span></a>
+      <button type="button" class="dash-tile" id="dash-talk" data-cta="talk"><span class="dt-ic">🎙</span><b>Talk to Kris</b><span class="tiny muted">Hands-free</span></button>
+    </div>
+    <details class="card flat more-tools" id="more-tools" open><summary><b>More tools</b> <span class="tiny muted">add any item, buy or pass, second look, business manager</span></summary>
       <div class="hero-actions">
         <a class="btn" href="#/add" data-cta="add">📷 Add an item</a>
         <a class="btn hero-secondary" href="#/scan" data-cta="scan">🔎 Buy or pass</a>
         <a class="btn hero-secondary" href="#/secondlook" data-cta="secondlook">👀 Second look: scan a table</a>
+        <a class="btn hero-secondary" href="#/biz" data-cta="biz">📈 Business manager: batches, calendar, reports</a>
       </div>
-    </div>
+    </details>
     ${paused ? `<div class="card alert" id="pause-banner">
       <div class="row between"><h3>Automation is paused</h3>${honesty("warn", "Paused")}</div>
       <p class="small">${esc(PAUSE_NOTE_ON)}</p>
@@ -60,12 +74,15 @@ export function renderHome(ctx, el) {
     </div>
     <div class="card flat honesty-card">
       <h3>What this version does</h3>
+      <p class="small">${honesty("ok", "New")} Start a listing: your Depop format (keywords, 5 hashtags, SKU last), then Mercari, Vinted and eBay in one tap. Business manager: batches, offers, pricing strategy, relisting calendar, and a financial snapshot. Talk to Kris hands-free.</p>
       <p class="small">${honesty("ok", "Working")} Photo to a draft, Buy or pass, Second look (scan a table), a tracker, a sold take-down checklist with a guided walk-through, price-drop ideas, profit and taxes, a morning list, and an Ask-a-question helper.</p>
       <p class="small">${honesty("warn", "Estimate")} AI prices, sold-price estimates, fees, shipping costs, Buy or pass verdicts, and Second look guesses. Check them yourself.</p>
       <p class="small">${honesty("warn", "Needs you to post")} You copy the listing and post it in each site's own app. Taking it down and changing a price is a checklist, not automatic. A guided walk-through can open each site for you.</p>
       <p class="small">${honesty("later", "Coming later")} Official one-tap listing and take-down (starting with eBay), official eBay sold prices, a computer helper, and buying shipping labels.</p>
     </div>
   `;
+  const talk = el.querySelector("#dash-talk");
+  if (talk) talk.addEventListener("click", () => import("../kris.js").then(m => m.openKrisTalk()));
 }
 
 function morningCard(morning, settings) {

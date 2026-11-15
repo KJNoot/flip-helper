@@ -57,7 +57,11 @@ export function renderItem(ctx, el, item) {
 
   el.innerHTML = `
     <div class="topbar"><a class="iconbtn" href="#/items" aria-label="Back">‹</a><h2 class="clamp2">${esc(item.title || "Untitled item")}</h2><span class="spacer48"></span></div>
-    <div class="row wrap" style="margin-bottom:8px">${pill(STAGE_LABELS[item.stage] || item.stage, item.stage)} ${alert ? pill("Take it down", "warn") : ""} ${item.unavailable && item.soldAt ? pill("Unavailable", "warn") : ""} ${item.binLocation ? pill("Bin " + item.binLocation) : ""}</div>
+    <div class="row wrap" style="margin-bottom:8px">${pill(STAGE_LABELS[item.stage] || item.stage, item.stage)} ${alert ? pill("Take it down", "warn") : ""} ${item.unavailable && item.soldAt ? pill("Unavailable", "warn") : ""} ${item.binLocation ? pill("Bin " + item.binLocation) : ""} ${item.sku ? pill(item.sku) : ""}</div>
+    <div class="row wrap item-biz" style="gap:8px;margin-bottom:8px">
+      <a class="btn sm" href="#/listing/${esc(item.id)}/${item.listings && item.listings.depop && item.listings.depop.approvedAt ? "sites" : (item.garment ? "depop" : "facts")}" id="item-listing">✍️ ${item.garment ? "Listings (Depop, Mercari, Vinted, eBay)" : "Make listings for this item"}</a>
+      <a class="btn sm soft" href="#/strategy/${esc(item.id)}" id="item-strategy">💲 Pricing, offers &amp; history</a>
+    </div>
 
     <div class="photos">
       ${photos.map((ph, i) => `<div class="photo">
